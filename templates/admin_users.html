@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">ARIA - Admin Dashboard</h1>
+            <div class="navbar-right">
+                <span class="username">{{ username }} (Admin)</span>
+                <a href="/dashboard" class="btn-secondary">Back to Dashboard</a>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <!-- Status Boxes -->
+            <div class="status-boxes">
+                <div class="status-box pending-box">
+                    <p class="status-label">Pending</p>
+                    <p class="status-number">{{ whitelist|length - all_users|length }}</p>
+                </div>
+                <div class="status-box whitelist-box">
+                    <p class="status-label">Whitelisted</p>
+                    <p class="status-number">{{ whitelist|length }}</p>
+                </div>
+                <div class="status-box created-box">
+                    <p class="status-label">Account Created</p>
+                    <p class="status-number">{{ all_users|length }}</p>
+                </div>
+            </div>
+
+            <!-- System Status and Activity -->
+            <div class="info-grid">
+                <!-- System Status -->
+                <div class="info-section">
+                    <h3>System Status</h3>
+                    <div class="status-info">
+                        <div class="status-item">
+                            <span class="status-label">ARIA Version</span>
+                            <span class="status-value">0.1.0</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Status</span>
+                            <span class="status-value online">Running</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Phase</span>
+                            <span class="status-value">Authentication Complete</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Next Phase</span>
+                            <span class="status-value">Device Integrations</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="info-section">
+                    <h3>Recent Activity</h3>
+                    <div class="activity-log">
+                        <div class="activity-item">
+                            <span class="activity-action">User Login</span>
+                            <span class="activity-user">{{ username }}</span>
+                            <span class="activity-time">Just now</span>
+                        </div>
+                        <div class="activity-item">
+                            <span class="activity-action">Dashboard Access</span>
+                            <span class="activity-user">Admin</span>
+                            <span class="activity-time">Now</span>
+                        </div>
+                        <div class="activity-item">
+                            <span class="activity-action">System Initialized</span>
+                            <span class="activity-user">System</span>
+                            <span class="activity-time">Today</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="admin-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="users">Manage Users</button>
+                    <button class="tab-btn" data-tab="whitelist">Manage Whitelist</button>
+                </div>
+
+                <!-- Users Tab -->
+                <div id="users-tab" class="tab-content active">
+                    <div class="admin-section">
+                        <h3>User Accounts</h3>
+                        <div class="user-list">
+                            {% if all_users %}
+                                {% for user_name, user_data in all_users.items() %}
+                                    <div class="user-item">
+                                        <div class="user-info">
+                                            <span class="user-name">{{ user_name }}</span>
+                                            {% if user_data.get('role') == 'admin' %}
+                                                <span class="badge admin">Admin</span>
+                                            {% else %}
+                                                <span class="badge user">User</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="user-actions">
+                                            {% if user_name != current_username %}
+                                                {% if user_data.get('role') != 'admin' %}
+                                                    <button class="btn-action btn-promote" data-username="{{ user_name }}">Make Admin</button>
+                                                {% else %}
+                                                    <button class="btn-action btn-demote" data-username="{{ user_name }}">Remove Admin</button>
+                                                {% endif %}
+                                                <button class="btn-action btn-remove" data-username="{{ user_name }}">Delete</button>
+                                            {% else %}
+                                                <span class="your-account">Your Account</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="empty-state">No accounts created yet</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Whitelist Tab -->
+                <div id="whitelist-tab" class="tab-content">
+                    <div class="admin-section">
+                        <h3>Add to Whitelist</h3>
+                        <form id="add-user-form" class="add-form">
+                            <div class="form-row">
+                                <input
+                                    type="text"
+                                    id="new-username"
+                                    placeholder="Enter username"
+                                    minlength="3"
+                                    required
+                                >
+                                <button type="submit" class="btn-primary">Add</button>
+                            </div>
+                            <span id="add-message" class="message"></span>
+                        </form>
+                    </div>
+
+                    <div class="admin-section">
+                        <h3>Whitelisted Users</h3>
+                        <div class="user-list">
+                            {% if whitelist %}
+                                {% for user in whitelist %}
+                                    <div class="user-item">
+                                        <div class="user-info">
+                                            <span class="user-name">{{ user }}</span>
+                                            {% if all_users.get(user) %}
+                                                <span class="status-badge created">Account Created</span>
+                                            {% else %}
+                                                <span class="status-badge pending">Pending</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if user != current_username %}
+                                            <button class="btn-action btn-remove" data-username="{{ user }}" data-action="remove-whitelist">Delete</button>
+                                        {% else %}
+                                            <span class="your-account">Your Account</span>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="empty-state">No users in whitelist</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.tab;
+
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(tabName + '-tab').classList.add('active');
+            });
+        });
+
+        // Handle add user to whitelist
+        document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('new-username').value;
+            const messageEl = document.getElementById('add-message');
+
+            try {
+                const response = await fetch('/api/whitelist/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}`
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.className = 'message success';
+                    messageEl.textContent = '✓ ' + data.message;
+                    document.getElementById('new-username').value = '';
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    messageEl.className = 'message error';
+                    messageEl.textContent = data.error;
+                }
+            } catch (error) {
+                messageEl.className = 'message error';
+                messageEl.textContent = 'Error adding user';
+            }
+        });
+
+        // Handle delete from whitelist
+        document.querySelectorAll('[data-action="remove-whitelist"]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const username = btn.dataset.username;
+                if (!confirm(`Delete "${username}" from whitelist?`)) return;
+
+                try {
+                    const response = await fetch('/api/whitelist/remove', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `username=${encodeURIComponent(username)}`
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                } catch (error) {
+                    alert('Error deleting user');
+                }
+            });
+        });
+
+        // Handle delete from users tab
+        document.querySelectorAll('.btn-remove:not([data-action])').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const username = btn.dataset.username;
+                if (!confirm(`Delete user "${username}"? They will lose access to ARIA.`)) return;
+
+                try {
+                    const response = await fetch('/api/whitelist/remove', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `username=${encodeURIComponent(username)}`
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                } catch (error) {
+                    alert('Error deleting user');
+                }
+            });
+        });
+
+        // Handle make admin
+        document.querySelectorAll('.btn-promote').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const username = btn.dataset.username;
+                if (!confirm(`Make "${username}" an admin?`)) return;
+
+                try {
+                    const response = await fetch('/api/users/promote', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `username=${encodeURIComponent(username)}`
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                } catch (error) {
+                    alert('Error promoting user');
+                }
+            });
+        });
+
+        // Handle remove admin
+        document.querySelectorAll('.btn-demote').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const username = btn.dataset.username;
+                if (!confirm(`Remove admin rights from "${username}"?`)) return;
+
+                try {
+                    const response = await fetch('/api/users/demote', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `username=${encodeURIComponent(username)}`
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                } catch (error) {
+                    alert('Error removing admin rights');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

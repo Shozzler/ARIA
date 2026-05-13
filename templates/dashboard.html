@@ -53,6 +53,15 @@
                 <p>ARIA v0.1.0 - Phase 1: Authentication Complete</p>
                 <p>Phase 2: Device Integrations Coming Soon</p>
             </div>
+
+            <!-- Admin section (only visible to admins) -->
+            {% if session.get('role') == 'admin' %}
+                <div class="admin-box">
+                    <h3>Admin Tools</h3>
+                    <p>You are logged in as an administrator.</p>
+                    <a href="/admin/users" class="btn-admin">Manage Users & Whitelist</a>
+                </div>
+            {% endif %}
         </div>
     </div>
 </body>

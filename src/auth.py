@@ -78,20 +78,26 @@ def load_users() -> dict:
 def login(username: str, password: str) -> bool:
     """
     Authenticate a user with username and password.
-    Returns True if credentials are correct, False otherwise.
+    ALSO checks if user is whitelisted.
+    Returns True if credentials are correct AND user is whitelisted, False otherwise.
     """
+    # Check if user is whitelisted first
+    if not is_whitelisted(username):
+        logger.warning(f"Login failed: User '{username}' is not whitelisted")
+        return False
+
     # Load all users from file
     users = load_users()
-    
+
     # Check if username exists
     if username not in users:
         logger.warning(f"Login failed: User '{username}' not found")
         return False
-    
+
     # Get the user's password hash
     user_data = users[username]
     password_hash = user_data['password_hash']
-    
+
     # Check if password matches
     if verify_password(password, password_hash):
         logger.info(f"User '{username}' logged in successfully")
@@ -103,34 +109,139 @@ def login(username: str, password: str) -> bool:
 class User:
     """
     Represents a user in the ARIA system.
-    Stores username, password hash, and user data.
+    Stores username, password hash, role, and user data.
     """
-    
-    def __init__(self, username: str, password: str):
+
+    def __init__(self, username: str, password: str, role: str = "user"):
         """
         Create a new user.
         username: the login username
         password: the plain password (will be hashed)
+        role: "admin", "user", or "guest" (default: "user")
         """
         self.username = username
         self.password_hash = hash_password(password)
+        self.role = role  # admin, user, or guest
         self.is_authenticated = False
-    
+
     def verify_password(self, password: str) -> bool:
         """
         Check if provided password matches the stored hash.
         """
         return verify_password(password, self.password_hash)
-    
+
+    def is_admin(self) -> bool:
+        """Check if user is an admin."""
+        return self.role == "admin"
+
     def to_dict(self) -> dict:
         """
         Convert user to a dictionary (for storing in file).
         """
         return {
             "username": self.username,
-            "password_hash": self.password_hash
+            "password_hash": self.password_hash,
+            "role": self.role
         }
 
-# File path for storing users
+# File paths
 USERS_FILE = os.path.join("data", "users.json")
+WHITELIST_FILE = os.path.join("data", "whitelist.json")
+
+
+def load_whitelist() -> list:
+    """
+    Load the whitelist of approved usernames.
+    Returns a list of approved usernames.
+    If file doesn't exist, returns empty list.
+    """
+    ensure_data_folder()
+
+    if not os.path.exists(WHITELIST_FILE):
+        logger.warning("Whitelist file not found")
+        return []
+
+    try:
+        with open(WHITELIST_FILE, 'r') as file:
+            data = json.load(file)
+        whitelist = data.get('whitelist', [])
+        logger.info(f"Loaded whitelist with {len(whitelist)} approved users")
+        return whitelist
+    except Exception as e:
+        logger.error(f"Error loading whitelist: {e}")
+        return []
+
+
+def is_whitelisted(username: str) -> bool:
+    """
+    Check if a username is on the whitelist.
+    Returns True if approved, False otherwise.
+    """
+    whitelist = load_whitelist()
+    return username.lower() in [u.lower() for u in whitelist]
+
+
+def add_to_whitelist(username: str) -> bool:
+    """
+    Add a username to the whitelist.
+    Returns True if successful, False if already exists.
+    """
+    ensure_data_folder()
+    whitelist = load_whitelist()
+
+    # Check if already in whitelist (case-insensitive)
+    if any(u.lower() == username.lower() for u in whitelist):
+        logger.warning(f"Username '{username}' already in whitelist")
+        return False
+
+    whitelist.append(username)
+
+    try:
+        with open(WHITELIST_FILE, 'w') as file:
+            json.dump({"whitelist": whitelist}, file, indent=2)
+        logger.info(f"Added '{username}' to whitelist")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating whitelist: {e}")
+        return False
+
+
+def remove_from_whitelist(username: str) -> bool:
+    """
+    Remove a username from the whitelist.
+    Returns True if successful, False if not found.
+    """
+    ensure_data_folder()
+    whitelist = load_whitelist()
+
+    # Find and remove (case-insensitive)
+    original_length = len(whitelist)
+    whitelist = [u for u in whitelist if u.lower() != username.lower()]
+
+    if len(whitelist) == original_length:
+        logger.warning(f"Username '{username}' not found in whitelist")
+        return False
+
+    try:
+        with open(WHITELIST_FILE, 'w') as file:
+            json.dump({"whitelist": whitelist}, file, indent=2)
+        logger.info(f"Removed '{username}' from whitelist")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating whitelist: {e}")
+        return False
+
+
+def get_user_role(username: str) -> str:
+    """
+    Get the role of a user.
+    Returns the role string (admin, user, guest) or None if user not found.
+    """
+    users = load_users()
+
+    if username not in users:
+        return None
+
+    user_data = users[username]
+    return user_data.get('role', 'user')  # Default to 'user' if role not specified
 

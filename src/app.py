@@ -6,7 +6,12 @@ Handles web interface and routing
 import os
 from flask import Flask, render_template, request, redirect, url_for, session
 import logging
-from src.auth import login, save_user, User
+from src.auth import (
+    login, save_user, User, is_whitelisted,
+    get_user_role, load_whitelist, add_to_whitelist,
+    remove_from_whitelist, load_users, USERS_FILE
+)
+import json
 
 # Get the directory where app.py is located
 # Then go up one level to ARIA root, then find templates/ and static/
@@ -44,7 +49,8 @@ def login_submit():
     # Try to login
     if login(username, password):
         session['username'] = username
-        logger.info(f"User {username} logged in successfully")
+        session['role'] = get_user_role(username)  # Store role in session
+        logger.info(f"User {username} logged in successfully (role: {session['role']})")
         return redirect(url_for('dashboard'))
     else:
         logger.warning(f"Failed login attempt for {username}")
@@ -73,6 +79,11 @@ def signup_submit():
 
     if password != password_confirm:
         return render_template('signup.html', error="Passwords do not match")
+
+    # Check if username is whitelisted
+    if not is_whitelisted(username):
+        logger.warning(f"Signup attempt for non-whitelisted user: {username}")
+        return render_template('signup.html', error="This username is not authorized. Contact the admin.")
 
     # Try to create user
     try:
@@ -103,6 +114,112 @@ def logout():
     session.clear()
     logger.info(f"User {username} logged out")
     return redirect(url_for('login_page'))
+
+# Route: User management (admin only)
+@app.route('/admin/users')
+def admin_users():
+    """Show user management page (admin only)"""
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+
+    whitelist = load_whitelist()
+    all_users = load_users()
+
+    return render_template('admin_users.html',
+                         username=session['username'],
+                         current_username=session['username'],
+                         whitelist=whitelist,
+                         all_users=all_users)
+
+# Route: Add user to whitelist (admin only)
+@app.route('/api/whitelist/add', methods=['POST'])
+def api_add_whitelist():
+    """API to add user to whitelist"""
+    if 'username' not in session or session.get('role') != 'admin':
+        return {'success': False, 'error': 'Unauthorized'}, 403
+
+    new_username = request.form.get('username', '').strip()
+
+    if not new_username or len(new_username) < 3:
+        return {'success': False, 'error': 'Username must be at least 3 characters'}, 400
+
+    if add_to_whitelist(new_username):
+        logger.info(f"Admin {session['username']} added {new_username} to whitelist")
+        return {'success': True, 'message': f'{new_username} added to whitelist'}
+    else:
+        return {'success': False, 'error': 'Username already in whitelist'}, 400
+
+# Route: Remove user from whitelist (admin only)
+@app.route('/api/whitelist/remove', methods=['POST'])
+def api_remove_whitelist():
+    """API to remove user from whitelist"""
+    if 'username' not in session or session.get('role') != 'admin':
+        return {'success': False, 'error': 'Unauthorized'}, 403
+
+    remove_username = request.form.get('username', '').strip()
+
+    # Don't allow removing yourself
+    if remove_username.lower() == session['username'].lower():
+        return {'success': False, 'error': 'Cannot remove yourself from whitelist'}, 400
+
+    if remove_from_whitelist(remove_username):
+        logger.info(f"Admin {session['username']} removed {remove_username} from whitelist")
+        return {'success': True, 'message': f'{remove_username} removed from whitelist'}
+    else:
+        return {'success': False, 'error': 'User not in whitelist'}, 400
+
+# Route: Promote user to admin (admin only)
+@app.route('/api/users/promote', methods=['POST'])
+def api_promote_user():
+    """API to promote user to admin"""
+    if 'username' not in session or session.get('role') != 'admin':
+        return {'success': False, 'error': 'Unauthorized'}, 403
+
+    username = request.form.get('username', '').strip()
+    users = load_users()
+
+    if username not in users:
+        return {'success': False, 'error': 'User not found'}, 404
+
+    users[username]['role'] = 'admin'
+
+    try:
+        with open(USERS_FILE, 'w') as file:
+            json.dump(users, file, indent=2)
+        logger.info(f"Admin {session['username']} promoted {username} to admin")
+        return {'success': True, 'message': f'{username} is now an admin'}
+    except Exception as e:
+        logger.error(f"Error promoting user: {str(e)}")
+        return {'success': False, 'error': 'Error promoting user'}, 500
+
+# Route: Demote user from admin (admin only)
+@app.route('/api/users/demote', methods=['POST'])
+def api_demote_user():
+    """API to demote user from admin"""
+    if 'username' not in session or session.get('role') != 'admin':
+        return {'success': False, 'error': 'Unauthorized'}, 403
+
+    username = request.form.get('username', '').strip()
+
+    # Don't allow demoting yourself
+    if username.lower() == session['username'].lower():
+        return {'success': False, 'error': 'Cannot demote yourself'}, 400
+
+    users = load_users()
+
+    if username not in users:
+        return {'success': False, 'error': 'User not found'}, 404
+
+    users[username]['role'] = 'user'
+
+    try:
+        with open(USERS_FILE, 'w') as file:
+            json.dump(users, file, indent=2)
+        logger.info(f"Admin {session['username']} demoted {username} from admin")
+        return {'success': True, 'message': f'{username} is no longer an admin'}
+    except Exception as e:
+        logger.error(f"Error demoting user: {str(e)}")
+        return {'success': False, 'error': 'Error demoting user'}, 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
