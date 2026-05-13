@@ -25,6 +25,80 @@ def ensure_data_folder():
         os.makedirs("data", exist_ok=True)
         logger.info("Data folder is ready")
 
+def save_user(user: User) -> bool:
+    """
+    Save a user to the users.json file.
+    Takes a User object and saves it.
+    Returns True if successful, False if user already exists.
+    """
+    ensure_data_folder()  # Make sure data folder exists
+    
+    # Load existing users from file
+    users = load_users()  # We'll write this next
+    
+    # Check if username already exists
+    if user.username in users:
+        logger.warning(f"User {user.username} already exists")
+        return False
+    
+    # Add new user to the dictionary
+    users[user.username] = user.to_dict()
+    
+    # Save back to file
+    with open(USERS_FILE, 'w') as file:
+        json.dump(users, file, indent=2)
+    
+    logger.info(f"User {user.username} saved successfully")
+    return True
+
+def load_users() -> dict:
+    """
+    Load all users from the users.json file.
+    Returns a dictionary of users.
+    If file doesn't exist, returns empty dictionary.
+    """
+    ensure_data_folder()  # Make sure folder exists
+    
+    # Check if users.json file exists
+    if not os.path.exists(USERS_FILE):
+        logger.info("No users file found, creating new one")
+        return {}  # Return empty dictionary
+    
+    # File exists, so read it
+    try:
+        with open(USERS_FILE, 'r') as file:
+            users = json.load(file)
+        logger.info(f"Loaded {len(users)} users from file")
+        return users
+    except Exception as e:
+        logger.error(f"Error loading users: {e}")
+        return {}
+    
+
+def login(username: str, password: str) -> bool:
+    """
+    Authenticate a user with username and password.
+    Returns True if credentials are correct, False otherwise.
+    """
+    # Load all users from file
+    users = load_users()
+    
+    # Check if username exists
+    if username not in users:
+        logger.warning(f"Login failed: User '{username}' not found")
+        return False
+    
+    # Get the user's password hash
+    user_data = users[username]
+    password_hash = user_data['password_hash']
+    
+    # Check if password matches
+    if verify_password(password, password_hash):
+        logger.info(f"User '{username}' logged in successfully")
+        return True
+    else:
+        logger.warning(f"Login failed: Wrong password for '{username}'")
+        return False
 
 class User:
     """
