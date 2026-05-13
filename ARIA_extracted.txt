@@ -1,0 +1,50 @@
+Introduction
+------------
+
+This project has for objective to centralise every connected device in a
+home. Aria will make life easier and make daily tasks faster.
+
+### Structure
+
+![](media/image1.png){width="6.268055555555556in"
+height="5.241666666666666in"}
+
+This is how ARIA will be structured. The User interface will be a Web
+Dashboard, maybe in the future I will developpe an application. The
+application will be running on a NAS in a container. And to conclude
+with this diagram ARIA will get all the information she needs in the API
+corresponding to the device.
+
+### Devices
+
+**ARIA** MCP Server running in a container on NAS
+
+**Oven** API (Home Connect)
+
+**Fridge** API (Home Connect
+
+**TV** API (LG)
+
+**Unifi Dorrbell** API (Unifi)
+
+What i can do :
+
+-   Use TV (switch on put channels
+
+-   Use the Oven
+
+-   Fridge (only check status)
+
+-   Doorbell activities
+
+-   Network (TBD)
+
+Security issues:
+
+-   Problem with the heating adding a maximum heat or maybe a switch off
+    button after 2- 3 hours
+
+-   Blocking outside connexion to the AI (hacking or spying problem)
+
+-   Network giving access to network connexion to the ai could be an
+    entry point for people outside.

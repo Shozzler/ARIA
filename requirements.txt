@@ -1,0 +1,17 @@
+# Core MCP Framework
+# We'll add the actual MCP dependencies as we go
+
+# API Clients
+requests==2.31.0
+
+# Web Framework (for future web dashboard)
+flask==3.0.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Logging
+colorlog==6.8.0
+
+# Testing (for later)
+pytest==7.4.0
