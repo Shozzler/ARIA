@@ -40,3 +40,4 @@ Thumbs.db
 # Project specific
 logs/
 config/secrets.json
+data/users.json
