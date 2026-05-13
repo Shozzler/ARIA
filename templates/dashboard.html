@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARIA Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">ARIA Dashboard</h1>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <h2>Connected Devices</h2>
+            <p class="info-text">Device controls will appear here once integrations are set up</p>
+
+            <div class="devices-grid">
+                <div class="device-card">
+                    <h3>Ubiquiti Router</h3>
+                    <p class="device-status">Status: <span class="status-pending">Pending Integration</span></p>
+                    <p class="device-description">Network management and device control</p>
+                </div>
+
+                <div class="device-card">
+                    <h3>Siemens Fridge</h3>
+                    <p class="device-status">Status: <span class="status-pending">Pending Integration</span></p>
+                    <p class="device-description">Temperature and door status monitoring</p>
+                </div>
+
+                <div class="device-card">
+                    <h3>Gaggenau Oven</h3>
+                    <p class="device-status">Status: <span class="status-pending">Pending Integration</span></p>
+                    <p class="device-description">Oven control and monitoring</p>
+                </div>
+
+                <div class="device-card">
+                    <h3>LG TV</h3>
+                    <p class="device-status">Status: <span class="status-pending">Pending Integration</span></p>
+                    <p class="device-description">Power, volume, and input control</p>
+                </div>
+            </div>
+
+            <div class="system-info">
+                <h3>System Information</h3>
+                <p>ARIA v0.1.0 - Phase 1: Authentication Complete</p>
+                <p>Phase 2: Device Integrations Coming Soon</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

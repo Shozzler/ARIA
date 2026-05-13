@@ -6,6 +6,7 @@ Main entry point for the MCP server
 import logging
 from colorlog import ColoredFormatter
 from src.auth import ensure_data_folder
+from src.app import app
 
 # Configure logging (so we can see what's happening when the server runs)
 def setup_logging():
@@ -42,15 +43,13 @@ def main():
     logger.info("ARIA - Starting up...")
     logger.info("=" * 60)
 
-    logger.info("ARIA MCP Server initialized successfully!")
-    logger.info("Ready to control your smart home devices")
+    logger.info("ARIA initialized successfully!")
+    logger.info("Starting Flask web application...")
 
-    # For now, just keep the program running
-    # We'll add the actual server code next
     try:
-        logger.info("Server is running. Press Ctrl+C to stop.")
-        while True:
-            pass
+        logger.info("ARIA is running on http://localhost:5000")
+        logger.info("Press Ctrl+C to stop the server")
+        app.run(host='0.0.0.0', port=5000, debug=True)
     except KeyboardInterrupt:
         logger.info("Server shutting down...")
         logger.info("Goodbye!")
