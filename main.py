@@ -5,6 +5,7 @@ Main entry point for the MCP server
 
 import logging
 from colorlog import ColoredFormatter
+from src.auth import ensure_data_folder
 
 # Configure logging (so we can see what's happening when the server runs)
 def setup_logging():
@@ -34,6 +35,8 @@ def main():
     """Main function - entry point of the application"""
     # Set up logging first
     logger = setup_logging()
+
+    ensure_data_folder()  # ← Add this line HERE (first thing!)
 
     logger.info("=" * 60)
     logger.info("ARIA - Starting up...")
