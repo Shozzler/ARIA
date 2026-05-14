@@ -83,15 +83,16 @@ def test_connection(api_key: str):
 
     for device in devices:
         name = device.get("name", "Unknown")
-        device_type = device.get("type", "unknown")
-        ip = device.get("ip", "N/A")
-        status = device.get("status", "unknown")
+        model = device.get("model", "Unknown")
+        ip = device.get("ipAddress", "N/A")
+        status = device.get("state", "unknown")
 
-        # Emoji for device type
-        emoji = "📷" if device_type in ["camera", "doorbell"] else "📱"
+        # Emoji for cameras
+        is_camera = any(keyword in model.lower() for keyword in ["nano", "turret", "bullet", "doorbell", "camera"])
+        emoji = "📷" if is_camera else "📱"
 
         print(f"   {emoji} {name}")
-        print(f"      Type: {device_type} | IP: {ip} | Status: {status}")
+        print(f"      Model: {model} | IP: {ip} | Status: {status}")
 
     # Get cameras only
     print("\n5️⃣  Filtering cameras...")
@@ -101,8 +102,9 @@ def test_connection(api_key: str):
         print(f"   ✓ Found {len(cameras)} camera(s)")
         for camera in cameras:
             name = camera.get("name", "Unknown")
-            ip = camera.get("ip", "N/A")
-            print(f"      📷 {name} ({ip})")
+            ip = camera.get("ipAddress", "N/A")
+            model = camera.get("model", "Unknown")
+            print(f"      📷 {name} ({model}) - IP: {ip}")
     else:
         print("   ⚠ No cameras found")
 

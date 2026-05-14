@@ -223,11 +223,13 @@ body {
     padding: 20px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s, box-shadow 0.3s;
+    display: block;
 }
 
 .device-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
 }
 
 .device-card h3 {
@@ -243,6 +245,11 @@ body {
 
 .status-pending {
     color: #ff9500;
+    font-weight: 600;
+}
+
+.status-active {
+    color: #27ae60;
     font-weight: 600;
 }
 

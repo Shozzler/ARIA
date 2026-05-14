@@ -11,6 +11,8 @@ from src.auth import (
     get_user_role, load_whitelist, add_to_whitelist,
     remove_from_whitelist, load_users, USERS_FILE
 )
+from src.integrations.unifi import UniFiClient
+from dotenv import load_dotenv
 import json
 
 # Get the directory where app.py is located
@@ -103,8 +105,78 @@ def dashboard():
     """Show dashboard (only for logged in users)"""
     if 'username' not in session:
         return redirect(url_for('login_page'))
-    
+
     return render_template('dashboard.html', username=session['username'])
+
+# Route: Dream Machine / Network Dashboard
+@app.route('/dreammachine')
+def dreammachine():
+    """Show Dream Machine network dashboard"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    # Load environment variables
+    load_dotenv()
+    controller_ip = os.getenv("UNIFI_CONTROLLER_IP", "10.20.40.1")
+    site_id = os.getenv("UNIFI_SITE_ID")
+    api_key = os.getenv("UNIFI_API_KEY")
+
+    # Check if credentials are available
+    if not site_id or not api_key:
+        return render_template('dreammachine.html',
+                             username=session['username'],
+                             error="UniFi credentials not configured in .env file")
+
+    try:
+        # Initialize UniFi client
+        client = UniFiClient(
+            controller_ip=controller_ip,
+            api_key=api_key,
+            verify_ssl=False
+        )
+
+        # Get devices
+        devices = client.get_devices(site_id)
+
+        # Get cameras
+        cameras = client.list_cameras(site_id)
+
+        # Prepare data for template
+        device_list = []
+        camera_list = []
+
+        if devices:
+            for device in devices:
+                device_list.append({
+                    'name': device.get('name', 'Unknown'),
+                    'model': device.get('model', 'Unknown'),
+                    'ip': device.get('ipAddress', 'N/A'),
+                    'mac': device.get('macAddress', 'N/A'),
+                    'status': device.get('state', 'unknown')
+                })
+
+        if cameras:
+            for camera in cameras:
+                camera_list.append({
+                    'name': camera.get('name', 'Unknown'),
+                    'model': camera.get('model', 'Unknown'),
+                    'ip': camera.get('ipAddress', 'N/A'),
+                    'mac': camera.get('macAddress', 'N/A'),
+                    'status': camera.get('state', 'unknown')
+                })
+
+        return render_template('dreammachine.html',
+                             username=session['username'],
+                             devices=device_list,
+                             cameras=camera_list,
+                             device_count=len(device_list),
+                             camera_count=len(camera_list))
+
+    except Exception as e:
+        logger.error(f"Error fetching Dream Machine data: {str(e)}")
+        return render_template('dreammachine.html',
+                             username=session['username'],
+                             error=f"Error connecting to Dream Machine: {str(e)}")
 
 # Route: Logout
 @app.route('/logout')

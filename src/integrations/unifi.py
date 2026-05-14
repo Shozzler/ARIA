@@ -188,8 +188,14 @@ class UniFiClient:
         if not devices:
             return None
 
-        # Filter for cameras (type == "camera" or "doorbell")
-        cameras = [d for d in devices if d.get("type") in ["camera", "doorbell"]]
+        # Filter for cameras by checking the model field for known camera models
+        # (Nano HD, Turret, Bullet, Doorbell, etc.)
+        camera_keywords = ["nano", "turret", "bullet", "doorbell", "camera"]
+        cameras = [
+            d for d in devices
+            if any(keyword in d.get("model", "").lower() for keyword in camera_keywords)
+        ]
+
         logger.info(f"Found {len(cameras)} camera(s)")
 
         return cameras if cameras else None
