@@ -200,6 +200,27 @@ class UniFiClient:
 
         return cameras if cameras else None
 
+    def get_all_clients(self, site_id: str) -> Optional[List[Dict]]:
+        """
+        Get all connected clients on the network (computers, phones, IoT devices, etc.)
+
+        Args:
+            site_id: The site ID
+
+        Returns:
+            List of client dictionaries or None if request fails
+        """
+        endpoint = f"/sites/{site_id}/clients"
+        response = self._make_request(endpoint)
+
+        if response and "data" in response:
+            clients = response["data"]
+            logger.info(f"Found {len(clients)} client(s) on site {site_id}")
+            return clients
+
+        logger.warning(f"No clients found on site {site_id}")
+        return None
+
     def get_connected_devices_count(self, site_id: str) -> Optional[int]:
         """
         Get count of connected devices on the network.

@@ -6,6 +6,45 @@
     <title>Dream Machine - ARIA</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
+        .search-bar {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .refresh-info {
+            text-align: right;
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+
+        .hidden-row {
+            display: none;
+        }
+
+        .device-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+            display: inline-block;
+        }
+
         .network-header {
             display: flex;
             justify-content: space-between;
@@ -193,6 +232,34 @@
         .refresh-button:hover {
             background: #218838;
         }
+
+        .connection-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .connection-badge.wired {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .connection-badge.wireless {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .connection-time {
+            font-size: 12px;
+            color: #666;
+            font-family: 'Courier New', monospace;
+        }
+
+        .clients-section {
+            margin-bottom: 40px;
+        }
     </style>
 </head>
 <body>
@@ -213,6 +280,20 @@
                 <a href="/dashboard">← Back to Dashboard</a>
             </div>
 
+            <!-- Refresh Info -->
+            <div class="refresh-info">
+                ⏱️ Auto-refreshing every 30 seconds | Last updated: <span id="last-update">just now</span>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="🔍 Search devices by name, IP, or MAC..."
+                >
+            </div>
+
             <!-- Error message if any -->
             {% if error %}
                 <div class="error-box">
@@ -222,8 +303,12 @@
 
             <!-- Network Stats -->
             <div class="network-stats">
+                <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h3>Total Connected Clients</h3>
+                    <div class="number">{{ client_count }}</div>
+                </div>
                 <div class="stat-card devices">
-                    <h3>Total Devices</h3>
+                    <h3>UniFi Devices</h3>
                     <div class="number">{{ device_count }}</div>
                 </div>
                 <div class="stat-card cameras">
@@ -276,6 +361,48 @@
                 {% endif %}
             </div>
 
+            <!-- All Connected Clients -->
+            <div class="clients-section">
+                <div class="section-title">🖥️ All Connected Clients ({{ client_count }})</div>
+
+                {% if clients %}
+                    <table class="devices-table">
+                        <thead>
+                            <tr>
+                                <th>Device Name</th>
+                                <th>IP Address</th>
+                                <th>MAC Address</th>
+                                <th>Type</th>
+                                <th>Connected</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in clients %}
+                                <tr>
+                                    <td><strong>{{ client.name }}</strong></td>
+                                    <td><span class="ip-address">{{ client.ip }}</span></td>
+                                    <td><span class="mac-address">{{ client.mac }}</span></td>
+                                    <td>
+                                        {% if client.type == 'WIRED' %}
+                                            <span class="connection-badge wired">🔌 Wired</span>
+                                        {% elif client.type == 'WIRELESS' %}
+                                            <span class="connection-badge wireless">📡 Wireless</span>
+                                        {% else %}
+                                            <span class="connection-badge">{{ client.type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="connection-time">{{ client.connected_at }}</span></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">
+                        <p>No clients connected</p>
+                    </div>
+                {% endif %}
+            </div>
+
             <!-- Cameras Only -->
             <div class="cameras-section">
                 <div class="section-title">📷 Network Cameras</div>
@@ -319,5 +446,124 @@
             {% endif %}
         </div>
     </div>
+
+    <script>
+        // Function to get icon for device based on name
+        function getDeviceIcon(name, type) {
+            const nameLower = name.toLowerCase();
+
+            // Cameras (including specific camera names)
+            if (nameLower.includes('camera') ||
+                nameLower.includes('nano') ||
+                nameLower.includes('doorbell') ||
+                nameLower.includes('garden') ||
+                nameLower.includes('entrance') ||
+                nameLower.includes('door') ||
+                nameLower.includes('daisy')) {
+                return '📷';
+            }
+            // Computers
+            if (nameLower.includes('desktop') || nameLower.includes('laptop') || nameLower.includes('pc')) {
+                return '🖥️';
+            }
+            // Phones/Mobile
+            if (nameLower.includes('phone') || nameLower.includes('iphone') || nameLower.includes('android')) {
+                return '📱';
+            }
+            // Smart Home
+            if (nameLower.includes('echo') || nameLower.includes('alexa') || nameLower.includes('google')) {
+                return '🏠';
+            }
+            // TVs
+            if (nameLower.includes('tv') || nameLower.includes('television') || nameLower.includes('roku')) {
+                return '📺';
+            }
+            // Printers
+            if (nameLower.includes('printer') || nameLower.includes('print')) {
+                return '🖨️';
+            }
+            // Switches/Network
+            if (nameLower.includes('switch') || nameLower.includes('router') || nameLower.includes('gateway')) {
+                return '🌐';
+            }
+            // Smart appliances
+            if (nameLower.includes('oven') || nameLower.includes('fridge') || nameLower.includes('washer')) {
+                return '🔌';
+            }
+
+            // Default based on connection type
+            if (type === 'WIRELESS') return '📡';
+            return '💻';
+        }
+
+        // Search/Filter functionality
+        document.getElementById('searchInput').addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            const tables = document.querySelectorAll('.devices-table tbody');
+
+            tables.forEach(table => {
+                const rows = table.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const text = row.innerText.toLowerCase();
+                    if (text.includes(searchTerm)) {
+                        row.classList.remove('hidden-row');
+                    } else {
+                        row.classList.add('hidden-row');
+                    }
+                });
+            });
+        });
+
+        // Auto-refresh every 30 seconds
+        function refreshPage() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            document.getElementById('last-update').innerText = timeStr;
+
+            // Actually reload the page
+            location.reload();
+        }
+
+        // Set up auto-refresh (30 seconds = 30000 milliseconds)
+        setInterval(refreshPage, 30000);
+
+        // Add device icons to tables on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add icons to client names
+            const clientRows = document.querySelectorAll('.clients-section .devices-table tbody tr');
+            clientRows.forEach(row => {
+                const nameCell = row.querySelector('td:first-child');
+                if (nameCell) {
+                    const name = nameCell.innerText;
+                    const typeCell = row.querySelector('td:nth-child(4)');
+                    const type = typeCell ? typeCell.innerText : '';
+                    const icon = getDeviceIcon(name, type);
+                    nameCell.innerHTML = icon + ' <strong>' + name + '</strong>';
+                }
+            });
+
+            // Add icons to device names
+            const deviceRows = document.querySelectorAll('.devices-section .devices-table tbody tr');
+            deviceRows.forEach(row => {
+                const nameCell = row.querySelector('td:first-child');
+                if (nameCell) {
+                    const name = nameCell.innerText;
+                    const icon = getDeviceIcon(name, 'WIRED');
+                    nameCell.innerHTML = icon + ' <strong>' + name + '</strong>';
+                }
+            });
+
+            // Add icons to camera names
+            const cameraRows = document.querySelectorAll('.cameras-section .devices-table tbody tr');
+            cameraRows.forEach(row => {
+                const nameCell = row.querySelector('td:first-child');
+                if (nameCell) {
+                    const name = nameCell.innerText;
+                    const icon = getDeviceIcon(name, 'WIRED');
+                    nameCell.innerHTML = icon + ' <strong>' + name + '</strong>';
+                }
+            });
+        });
+    </script>
 </body>
 </html>

@@ -135,15 +135,15 @@ def dreammachine():
             verify_ssl=False
         )
 
-        # Get devices
+        # Get all data
         devices = client.get_devices(site_id)
-
-        # Get cameras
         cameras = client.list_cameras(site_id)
+        clients = client.get_all_clients(site_id)
 
         # Prepare data for template
         device_list = []
         camera_list = []
+        client_list = []
 
         if devices:
             for device in devices:
@@ -152,7 +152,8 @@ def dreammachine():
                     'model': device.get('model', 'Unknown'),
                     'ip': device.get('ipAddress', 'N/A'),
                     'mac': device.get('macAddress', 'N/A'),
-                    'status': device.get('state', 'unknown')
+                    'status': device.get('state', 'unknown'),
+                    'firmware': device.get('firmwareVersion', 'N/A')
                 })
 
         if cameras:
@@ -165,12 +166,66 @@ def dreammachine():
                     'status': camera.get('state', 'unknown')
                 })
 
+        if clients:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+
+            for client_item in clients:
+                # Parse connection timestamp and calculate time since connected
+                connected_at = client_item.get('connectedAt', 'N/A')
+                connected_time = 'N/A'
+
+                try:
+                    if connected_at and connected_at != 'N/A':
+                        # Handle ISO format string (e.g., "2026-03-24T02:58:15Z")
+                        if isinstance(connected_at, str):
+                            connected_dt = datetime.fromisoformat(connected_at.replace('Z', '+00:00'))
+                        # Handle Unix timestamp (milliseconds)
+                        elif isinstance(connected_at, (int, float)):
+                            connected_dt = datetime.fromtimestamp(connected_at / 1000, tz=timezone.utc)
+                        else:
+                            connected_dt = None
+
+                        if connected_dt:
+                            # Calculate time difference
+                            time_diff = now - connected_dt
+                            seconds = time_diff.total_seconds()
+
+                            # Format as relative time
+                            if seconds < 60:
+                                connected_time = f"{int(seconds)} seconds ago"
+                            elif seconds < 3600:
+                                minutes = int(seconds / 60)
+                                connected_time = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+                            elif seconds < 86400:
+                                hours = int(seconds / 3600)
+                                connected_time = f"{hours} hour{'s' if hours != 1 else ''} ago"
+                            elif seconds < 604800:
+                                days = int(seconds / 86400)
+                                connected_time = f"{days} day{'s' if days != 1 else ''} ago"
+                            else:
+                                weeks = int(seconds / 604800)
+                                connected_time = f"{weeks} week{'s' if weeks != 1 else ''} ago"
+                except Exception as e:
+                    logger.warning(f"Could not parse connection time: {e}")
+                    connected_time = 'N/A'
+
+                client_list.append({
+                    'name': client_item.get('name', 'Unknown'),
+                    'ip': client_item.get('ipAddress', 'N/A'),
+                    'mac': client_item.get('macAddress', 'N/A'),
+                    'type': client_item.get('type', 'UNKNOWN'),
+                    'connected_at': connected_time
+                })
+
         return render_template('dreammachine.html',
                              username=session['username'],
                              devices=device_list,
                              cameras=camera_list,
+                             clients=client_list,
                              device_count=len(device_list),
-                             camera_count=len(camera_list))
+                             camera_count=len(camera_list),
+                             client_count=len(client_list))
 
     except Exception as e:
         logger.error(f"Error fetching Dream Machine data: {str(e)}")
