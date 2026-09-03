@@ -12,6 +12,8 @@ from src.auth import (
     remove_from_whitelist, load_users, USERS_FILE
 )
 from src.integrations.unifi import UniFiClient
+from src.integrations.unifi import UniFiClient
+from src.device_categorizer import categorize_device
 from dotenv import load_dotenv
 import json
 
@@ -215,7 +217,8 @@ def dreammachine():
                     'ip': client_item.get('ipAddress', 'N/A'),
                     'mac': client_item.get('macAddress', 'N/A'),
                     'type': client_item.get('type', 'UNKNOWN'),
-                    'connected_at': connected_time
+                    'connected_at': connected_time,
+                    'category': categorize_device(client_item.get('name', 'Unknown'))
                 })
 
         return render_template('dreammachine.html',

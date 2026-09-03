@@ -55,8 +55,10 @@ for endpoint in endpoints:
                 print(f"✓ Found {count} item(s)")
 
                 if count > 0:
-                    print("\nFirst item:")
-                    print(json.dumps(data["data"][0], indent=2))
+                    print("\nAll items:")
+                    for item in data["data"]:
+                        print(json.dumps(item, indent=2))
+                        print("-" * 40)
             else:
                 print("Response:")
                 print(json.dumps(data, indent=2))

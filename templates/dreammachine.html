@@ -373,6 +373,7 @@
                                 <th>IP Address</th>
                                 <th>MAC Address</th>
                                 <th>Type</th>
+                                <th>Category</th>
                                 <th>Connected</th>
                             </tr>
                         </thead>
@@ -391,6 +392,7 @@
                                             <span class="connection-badge">{{ client.type }}</span>
                                         {% endif %}
                                     </td>
+                                    <td><span class="connection-badge">{{ client.category }}</span></td>
                                     <td><span class="connection-time">{{ client.connected_at }}</span></td>
                                 </tr>
                             {% endfor %}
