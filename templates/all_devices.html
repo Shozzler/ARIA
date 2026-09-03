@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Devices - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">All Devices</h1>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="/dashboard">← Back to Dashboard</a>
+            </div>
+
+            <div class="devices-grid">
+                <a href="/dreammachine" class="device-card" style="text-decoration: none; color: inherit;">
+                    <h3>Ubiquiti Router</h3>
+                    <p class="device-status">Status: <span class="status-active">✓ Active</span></p>
+                    <p class="device-description">Network management and device control</p>
+                </a>
+
+                <a href="/homeconnect" class="device-card" style="text-decoration: none; color: inherit;">
+                    <h3>Siemens Fridge</h3>
+                    <p class="device-status">Status: <span class="status-active">✓ Active</span></p>
+                    <p class="device-description">Temperature and door status monitoring</p>
+                </a>
+
+                <a href="/homeconnect" class="device-card" style="text-decoration: none; color: inherit;">
+                    <h3>Gaggenau Oven</h3>
+                    <p class="device-status">Status: <span class="status-active">✓ Active</span></p>
+                    <p class="device-description">Oven control and monitoring</p>
+                </a>
+
+                <div class="device-card">
+                    <h3>LG TV</h3>
+                    <p class="device-status">Status: <span class="status-pending">Pending Integration</span></p>
+                    <p class="device-description">Power, volume, and input control</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

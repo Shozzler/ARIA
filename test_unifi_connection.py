@@ -60,11 +60,13 @@ def test_connection(api_key: str):
         return False
 
     print(f"   ✓ Found {len(sites)} site(s)")
-    for site in sites:
-        print(f"      - {site.get('name', 'Unknown')} (ID: {site.get('id', 'N/A')})")
+
+    # DEBUG: Print raw site data
+    print("\n   🔍 DEBUG - Raw site data:")
+    print(json.dumps(sites[0], indent=2))
 
     # Get site ID (use first site)
-    site_id = sites[0].get("id")
+    site_id = sites[0].get("_id")
     print(f"\n   Using site: {site_id}")
 
     # Get devices
@@ -83,16 +85,15 @@ def test_connection(api_key: str):
 
     for device in devices:
         name = device.get("name", "Unknown")
-        model = device.get("model", "Unknown")
-        ip = device.get("ipAddress", "N/A")
-        status = device.get("state", "unknown")
+        device_type = device.get("type", "unknown")
+        ip = device.get("ip", "N/A")
+        status = device.get("status", "unknown")
 
-        # Emoji for cameras
-        is_camera = any(keyword in model.lower() for keyword in ["nano", "turret", "bullet", "doorbell", "camera"])
-        emoji = "📷" if is_camera else "📱"
+        # Emoji for device type
+        emoji = "📷" if device_type in ["camera", "doorbell"] else "📱"
 
         print(f"   {emoji} {name}")
-        print(f"      Model: {model} | IP: {ip} | Status: {status}")
+        print(f"      Type: {device_type} | IP: {ip} | Status: {status}")
 
     # Get cameras only
     print("\n5️⃣  Filtering cameras...")
@@ -102,9 +103,8 @@ def test_connection(api_key: str):
         print(f"   ✓ Found {len(cameras)} camera(s)")
         for camera in cameras:
             name = camera.get("name", "Unknown")
-            ip = camera.get("ipAddress", "N/A")
-            model = camera.get("model", "Unknown")
-            print(f"      📷 {name} ({model}) - IP: {ip}")
+            ip = camera.get("ip", "N/A")
+            print(f"      📷 {name} ({ip})")
     else:
         print("   ⚠ No cameras found")
 

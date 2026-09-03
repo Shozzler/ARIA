@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HomeConnect - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">🍳 HomeConnect Appliances</h1>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="/dashboard">← Back to Dashboard</a>
+            </div>
+
+            {% if error %}
+                <div class="error-box">
+                    <strong>Error:</strong> {{ error }}
+                </div>
+            {% else %}
+
+            <div class="network-stats">
+                <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h3>Total Appliances</h3>
+                    <div class="number">{{ appliance_count }}</div>
+                </div>
+            </div>
+
+            <div class="devices-section">
+                <div class="section-title">🏠 Your Appliances</div>
+
+                {% if appliances %}
+                    <table class="devices-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Brand</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for appliance in appliances %}
+                                <tr>
+                                    <td><strong>{{ appliance.name }}</strong></td>
+                                    <td>{{ appliance.type }}</td>
+                                    <td>{{ appliance.brand }}</td>
+                                    <td>
+                                        {% if appliance.connected %}
+                                            <span class="status-badge status-online">Connected</span>
+                                        {% else %}
+                                            <span class="status-badge status-offline">Offline</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">
+                        <p>No appliances found</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

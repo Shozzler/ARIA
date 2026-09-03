@@ -41,3 +41,4 @@ Thumbs.db
 logs/
 config/secrets.json
 data/users.json
+data/homeconnect_tokens.json

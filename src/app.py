@@ -17,6 +17,9 @@ from src.device_categorizer import categorize_device
 from dotenv import load_dotenv
 import json
 
+from src.integrations.unifi import UniFiClient
+from src.integrations.homeconnect import HomeConnectClient
+
 # Get the directory where app.py is located
 # Then go up one level to ARIA root, then find templates/ and static/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -235,6 +238,29 @@ def dreammachine():
         return render_template('dreammachine.html',
                              username=session['username'],
                              error=f"Error connecting to Dream Machine: {str(e)}")
+    
+# Route: HomeConnect / Appliances Dashboard
+@app.route('/homeconnect')
+def homeconnect():
+    """Show HomeConnect appliances dashboard"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    load_dotenv()
+    base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+
+    client = HomeConnectClient(base_url=base_url)
+    appliances = client.get_appliances()
+
+    if appliances is None:
+        return render_template('homeconnect.html',
+                             username=session['username'],
+                             error="Could not fetch appliances. Have you logged in with homeconnect_login.py?")
+
+    return render_template('homeconnect.html',
+                         username=session['username'],
+                         appliances=appliances,
+                         appliance_count=len(appliances))
 
 # Route: Logout
 @app.route('/logout')
@@ -260,6 +286,15 @@ def admin_users():
                          current_username=session['username'],
                          whitelist=whitelist,
                          all_users=all_users)
+
+# Route: All Devices (flat list of every individual device)
+@app.route('/all-devices')
+def all_devices():
+    """Show every individual device, regardless of category"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    return render_template('all_devices.html', username=session['username'])
 
 # Route: Add user to whitelist (admin only)
 @app.route('/api/whitelist/add', methods=['POST'])
