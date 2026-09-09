@@ -9,7 +9,8 @@
 
 $ErrorActionPreference = "Stop"
 
-$LocalPath  = "C:\Users\sford\Documents\ARIA\*"
+$LocalRoot  = "C:\Users\sford\Documents\ARIA"
+$LocalPath  = "$LocalRoot\*"
 $RemoteUser = "AriaSSH"
 $RemoteHost = "10.20.40.23"
 $RemotePort = "58997"
@@ -17,7 +18,10 @@ $RemotePath = "/share/CACHEDEV1_DATA/Container/ARIA/"
 $ImageName  = "docker-compose-aria"
 
 Write-Host "==> Step 1/2: Copying files to the NAS..." -ForegroundColor Cyan
+# Note: scp's wildcard (*) follows Unix glob rules and does NOT match
+# dotfiles like .env, so we copy those separately and explicitly.
 scp -O -P $RemotePort -r $LocalPath "${RemoteUser}@${RemoteHost}:${RemotePath}"
+scp -O -P $RemotePort "$LocalRoot\.env" "${RemoteUser}@${RemoteHost}:${RemotePath}.env"
 
 Write-Host ""
 Write-Host "==> Step 2/2: Rebuilding the Docker image on the NAS..." -ForegroundColor Cyan
