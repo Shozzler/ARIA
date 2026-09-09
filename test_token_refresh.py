@@ -55,14 +55,31 @@ ok = client.set_appliance_setting(
     "BSH.Common.EnumType.PowerState.On"
 )
 print("Success!" if ok else "Failed - check logs above")
-print("\n--- Inspecting PowerState setting detail ---")
-access_token = client._load_access_token()
-resp = requests.get(
-    "https://simulator.home-connect.com/api/homeappliances/BOSCH-HCS06COM1-E896B6758BFC/settings/BSH.Common.Setting.PowerState",
-    headers={
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/vnd.bsh.sdk.v1+json"
-    }
-)
-print(resp.status_code)
-print(resp.text)
+
+print("\n--- CoffeeMaker available programs ---")
+programs = client.get_available_programs("BOSCH-HCS06COM1-E896B6758BFC")
+if programs is None:
+    print("Could not get programs (see logs above)")
+else:
+    for p in programs:
+        print(f"  {p}")
+
+print("\n--- Starting Cotton wash on Washer ---")
+ok = client.start_program("SIEMENS-HCS03WCH1-7E6E6A555B36", "LaundryCare.Washer.Program.Cotton")
+print("Success!" if ok else "Failed - check logs above")
+
+print("\n--- Checking status after start ---")
+status = client.get_appliance_status("SIEMENS-HCS03WCH1-7E6E6A555B36")
+for item in status:
+    print(f"  {item.get('key')}: {item.get('value')}")
+
+print("\n--- Stopping program ---")
+ok = client.stop_program("SIEMENS-HCS03WCH1-7E6E6A555B36")
+print("Success!" if ok else "Failed - check logs above")
+print("\n--- Washer available programs ---")
+programs = client.get_available_programs("SIEMENS-HCS03WCH1-7E6E6A555B36")
+if programs is None:
+    print("Could not get programs (see logs above)")
+else:
+    for p in programs:
+        print(f"  {p}")

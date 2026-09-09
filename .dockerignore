@@ -1,0 +1,9 @@
+.env
+.git
+.gitignore
+data/
+__pycache__/
+*.pyc
+.vscode/
+tests/
+*.md

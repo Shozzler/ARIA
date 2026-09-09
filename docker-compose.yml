@@ -1,0 +1,11 @@
+services:
+  aria:
+    build: /share/CACHEDEV1_DATA/Container/ARIA
+    container_name: aria-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - /share/CACHEDEV1_DATA/Container/ARIA/data:/app/data
+    env_file:
+      - /share/CACHEDEV1_DATA/Container/ARIA/.env
