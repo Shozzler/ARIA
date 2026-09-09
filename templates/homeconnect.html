@@ -49,6 +49,7 @@
                             <th>Status</th>
                             <th>Details</th>
                             <th>Power</th>
+                            <th>Programs</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -89,6 +90,20 @@
                                                         Turn On
                                                     {% endif %}
                                                 </button>
+                                            </form>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if appliance.programs %}
+                                            <form method="POST" action="{{ url_for('start_appliance_program', ha_id=appliance.haId) }}">
+                                                <select name="program_key">
+                                                    {% for program in appliance.programs %}
+                                                        <option value="{{ program.key }}">{{ program.key.split('.')[-1] }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="submit" class="btn-action">Start</button>
                                             </form>
                                         {% else %}
                                             <span class="text-muted">—</span>

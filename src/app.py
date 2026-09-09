@@ -263,6 +263,8 @@ def homeconnect():
 
         settings = client.get_appliance_settings(appliance['haId'])
         appliance['power_state'] = None
+        programs = client.get_available_programs(appliance['haId'])
+        appliance['programs'] = programs if programs else []
         if settings:
             for item in settings:
                 if item.get('key') == 'BSH.Common.Setting.PowerState':
@@ -290,6 +292,22 @@ def toggle_appliance_power(ha_id):
 
     return redirect(url_for('homeconnect'))
 
+# Route: Start a program on an appliance
+@app.route('/homeconnect/<ha_id>/start-program', methods=['POST'])
+def start_appliance_program(ha_id):
+    """Start the selected program on an appliance"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    load_dotenv()
+    base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+    client = HomeConnectClient(base_url=base_url)
+
+    program_key = request.form.get('program_key')
+    if program_key:
+        client.start_program(ha_id, program_key)
+
+    return redirect(url_for('homeconnect'))
 # Route: Logout
 @app.route('/logout')
 def logout():

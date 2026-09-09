@@ -76,6 +76,8 @@ for item in status:
 print("\n--- Stopping program ---")
 ok = client.stop_program("SIEMENS-HCS03WCH1-7E6E6A555B36")
 print("Success!" if ok else "Failed - check logs above")
+
+
 print("\n--- Washer available programs ---")
 programs = client.get_available_programs("SIEMENS-HCS03WCH1-7E6E6A555B36")
 if programs is None:
@@ -83,3 +85,13 @@ if programs is None:
 else:
     for p in programs:
         print(f"  {p}")
+
+print("\n--- Full settings for CoffeeMaker ---")
+settings = client.get_appliance_settings("BOSCH-HCS06COM1-E896B6758BFC")
+for s in settings:
+    print(f"  {s.get('key')}: {s.get('value')}")
+
+print("\n--- Full settings for Washer ---")
+settings = client.get_appliance_settings("SIEMENS-HCS03WCH1-7E6E6A555B36")
+for s in settings:
+    print(f"  {s.get('key')}: {s.get('value')}")
