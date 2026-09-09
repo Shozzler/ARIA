@@ -2,6 +2,7 @@ import requests
 import os
 import webbrowser
 import json
+import time
 from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qs
 
@@ -18,6 +19,7 @@ TOKEN_FILE = "data/homeconnect_tokens.json"
 def save_tokens(tokens):
     """Save the tokens to a file so we don't have to log in every time."""
     os.makedirs("data", exist_ok=True)
+    tokens["obtained_at"] = time.time()
     with open(TOKEN_FILE, "w") as file:
         json.dump(tokens, file, indent=2)
     print(f"Tokens saved to {TOKEN_FILE}")
@@ -27,7 +29,7 @@ def get_authorize_url():
         f"{AUTH_BASE}/authorize"
         f"?response_type=code"
         f"&client_id={CLIENT_ID}"
-        f"&scope=IdentifyAppliance"
+        f"&scope=IdentifyAppliance%20Monitor%20Settings%20Control"
         f"&redirect_uri={REDIRECT_URI}"
     )
 

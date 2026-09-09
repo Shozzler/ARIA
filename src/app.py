@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 import json
 
 from src.integrations.unifi import UniFiClient
-from src.integrations.homeconnect import HomeConnectClient
+from src.integrations.homeconnect import HomeConnectClient, format_status
 
 # Get the directory where app.py is located
 # Then go up one level to ARIA root, then find templates/ and static/
@@ -257,10 +257,38 @@ def homeconnect():
                              username=session['username'],
                              error="Could not fetch appliances. Have you logged in with homeconnect_login.py?")
 
+    for appliance in appliances:
+        status = client.get_appliance_status(appliance['haId'])
+        appliance['status_display'] = format_status(status) if status else []
+
+        settings = client.get_appliance_settings(appliance['haId'])
+        appliance['power_state'] = None
+        if settings:
+            for item in settings:
+                if item.get('key') == 'BSH.Common.Setting.PowerState':
+                    appliance['power_state'] = item.get('value', '').split('.')[-1]
     return render_template('homeconnect.html',
-                         username=session['username'],
-                         appliances=appliances,
-                         appliance_count=len(appliances))
+        username=session['username'],
+        appliances=appliances,
+        appliance_count=len(appliances))
+
+# Route: Toggle appliance power state
+@app.route('/homeconnect/<ha_id>/toggle-power', methods=['POST'])
+def toggle_appliance_power(ha_id):
+    """Flip an appliance's PowerState between On and Standby"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    load_dotenv()
+    base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+    client = HomeConnectClient(base_url=base_url)
+
+    current_state = request.form.get('current_state')
+    new_value = "BSH.Common.EnumType.PowerState.Standby" if current_state == "On" else "BSH.Common.EnumType.PowerState.On"
+
+    client.set_appliance_setting(ha_id, "BSH.Common.Setting.PowerState", new_value)
+
+    return redirect(url_for('homeconnect'))
 
 # Route: Logout
 @app.route('/logout')
