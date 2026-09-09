@@ -11,7 +11,8 @@ load_dotenv()
 CLIENT_ID = os.getenv("HOMECONNECT_CLIENT_ID")
 CLIENT_SECRET = os.getenv("HOMECONNECT_CLIENT_SECRET")
 REDIRECT_URI = "http://localhost:5000/homeconnect/callback"
-AUTH_BASE = "https://simulator.home-connect.com/security/oauth"
+BASE_URL = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+AUTH_BASE = f"{BASE_URL}/security/oauth"
 
 TOKEN_FILE = "data/homeconnect_tokens.json"
 
