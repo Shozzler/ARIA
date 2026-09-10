@@ -4,7 +4,8 @@ Handles web interface and routing
 """
 
 import os
-from flask import Flask, render_template, request, redirect, url_for, session
+import time
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 import logging
 from src.auth import (
     login, save_user, User, is_whitelisted,
@@ -19,6 +20,13 @@ import json
 
 from src.integrations.unifi import UniFiClient
 from src.integrations.homeconnect import HomeConnectClient, format_status
+from src.activity import (
+    record_visit, record_action, get_activity, toggle_pin, relative_time, DASHBOARD_LIMIT
+)
+from flask_wtf import CSRFProtect
+
+# Load .env before anything below reads from it (app.secret_key included)
+load_dotenv()
 
 # Get the directory where app.py is located
 # Then go up one level to ARIA root, then find templates/ and static/
@@ -30,7 +38,79 @@ STATIC_DIR = os.path.join(BASE_DIR, 'static')
 app = Flask(__name__,
             template_folder=TEMPLATE_DIR,
             static_folder=STATIC_DIR)
-app.secret_key = "your-secret-key-change-this"  # For sessions
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+if not app.secret_key:
+    raise RuntimeError(
+        "FLASK_SECRET_KEY is not set in .env - generate one with: "
+        "python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
+# Protects every POST/PUT/PATCH/DELETE route against CSRF by default.
+# Forms need a csrf_token field; JS fetch() calls need an X-CSRFToken header.
+csrf = CSRFProtect(app)
+
+# HomeConnect allows only 50 API calls per minute. The appliance list and each
+# appliance's program list barely ever change, so we cache them for a while
+# instead of re-fetching on every page load - this is what keeps the auto-refresh
+# on /homeconnect from tripping the rate limit.
+_program_options_cache = {}
+_appliances_cache = {"data": None, "fetched_at": 0}
+_available_programs_cache = {}  # haId -> {"data": [...], "fetched_at": ...}
+CACHE_TTL_SECONDS = 300  # 5 minutes
+
+
+def get_cached_appliances(client):
+    # Get the appliance list, from cache when it is fresh enough.
+    # Falls back to the last known list if a live fetch fails (e.g. a
+    # temporary rate limit) instead of showing an error for no reason.
+    now = time.time()
+    if _appliances_cache["data"] is not None and now - _appliances_cache["fetched_at"] < CACHE_TTL_SECONDS:
+        return _appliances_cache["data"]
+
+    appliances = client.get_appliances()
+    if appliances is not None:
+        _appliances_cache["data"] = appliances
+        _appliances_cache["fetched_at"] = now
+        return appliances
+
+    return _appliances_cache["data"]  # None if we have never had a successful fetch
+
+
+def get_cached_programs(client, ha_id):
+    # Get one appliance's available-programs list, from cache when fresh enough.
+    now = time.time()
+    cached = _available_programs_cache.get(ha_id)
+    if cached is not None and now - cached["fetched_at"] < CACHE_TTL_SECONDS:
+        return cached["data"]
+
+    programs = client.get_available_programs(ha_id)
+    if programs is not None:
+        _available_programs_cache[ha_id] = {"data": programs, "fetched_at": now}
+        return programs
+
+    return cached["data"] if cached is not None else None
+
+
+_status_cache = {}  # haId -> {"data": ..., "fetched_at": ...}
+STATUS_CACHE_TTL_SECONDS = 45  # short - status changes while a program runs
+
+
+def get_cached_status(client, ha_id):
+    # Get one appliance's live status, from a short cache. Status changes
+    # while a program is running (temperature climbing) so this TTL is much
+    # shorter than the other caches - just enough to survive a quick
+    # double page-load without doubling the API calls.
+    now = time.time()
+    cached = _status_cache.get(ha_id)
+    if cached is not None and now - cached["fetched_at"] < STATUS_CACHE_TTL_SECONDS:
+        return cached["data"]
+
+    status = client.get_appliance_status(ha_id)
+    if status is not None:
+        _status_cache[ha_id] = {"data": status, "fetched_at": now}
+        return status
+
+    return cached["data"] if cached is not None else None
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +191,35 @@ def dashboard():
     if 'username' not in session:
         return redirect(url_for('login_page'))
 
-    return render_template('dashboard.html', username=session['username'])
+    username = session['username']
+    recent = get_activity(username, limit=DASHBOARD_LIMIT)
+
+    # Enrich appliance actions with a live status line, reusing the same
+    # short-lived cache HomeConnect calls elsewhere use to stay rate-limit safe.
+    ha_ids_needed = {
+        e['meta']['ha_id'] for e in recent
+        if e['kind'] == 'action' and e.get('meta', {}).get('ha_id')
+    }
+    if ha_ids_needed:
+        load_dotenv()
+        base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+        client = HomeConnectClient(base_url=base_url)
+        for appliance in (get_cached_appliances(client) or []):
+            if appliance['haId'] not in ha_ids_needed:
+                continue
+            status = get_cached_status(client, appliance['haId'])
+            live = {
+                'status_display': format_status(status) if status else [],
+                'connected': appliance.get('connected', False),
+            }
+            for e in recent:
+                if e['kind'] == 'action' and e.get('meta', {}).get('ha_id') == appliance['haId']:
+                    e['live'] = live
+
+    for e in recent:
+        e['last_used_display'] = relative_time(e.get('last_used', ''))
+
+    return render_template('dashboard.html', username=username, recent=recent)
 
 # Route: Dream Machine / Network Dashboard
 @app.route('/dreammachine')
@@ -224,6 +332,8 @@ def dreammachine():
                     'category': categorize_device(client_item.get('name', 'Unknown'))
                 })
 
+        record_visit(session['username'], 'network', 'Network', url_for('dreammachine'))
+
         return render_template('dreammachine.html',
                              username=session['username'],
                              devices=device_list,
@@ -250,7 +360,7 @@ def homeconnect():
     base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
 
     client = HomeConnectClient(base_url=base_url)
-    appliances = client.get_appliances()
+    appliances = get_cached_appliances(client)
 
     if appliances is None:
         return render_template('homeconnect.html',
@@ -258,17 +368,32 @@ def homeconnect():
                              error="Could not fetch appliances. Have you logged in with homeconnect_login.py?")
 
     for appliance in appliances:
-        status = client.get_appliance_status(appliance['haId'])
+        status = get_cached_status(client, appliance['haId'])
         appliance['status_display'] = format_status(status) if status else []
 
         settings = client.get_appliance_settings(appliance['haId'])
         appliance['power_state'] = None
-        programs = client.get_available_programs(appliance['haId'])
+        programs = get_cached_programs(client, appliance['haId'])
         appliance['programs'] = programs if programs else []
+        for program in appliance['programs']:
+            cache_key = (appliance['haId'], program['key'])
+            if cache_key in _program_options_cache:
+                program['temperature'] = _program_options_cache[cache_key]
+            else:
+                program_options = client.get_program_options(appliance['haId'], program['key'])
+                program['temperature'] = None
+                if program_options:
+                    for opt in program_options:
+                        if opt.get('key') == 'Cooking.Oven.Option.SetpointTemperature':
+                            program['temperature'] = opt.get('constraints', {})
+                            break
+                _program_options_cache[cache_key] = program['temperature']
         if settings:
             for item in settings:
                 if item.get('key') == 'BSH.Common.Setting.PowerState':
                     appliance['power_state'] = item.get('value', '').split('.')[-1]
+    record_visit(session['username'], 'appliances', 'Appliances', url_for('homeconnect'))
+
     return render_template('homeconnect.html',
         username=session['username'],
         appliances=appliances,
@@ -288,7 +413,20 @@ def toggle_appliance_power(ha_id):
     current_state = request.form.get('current_state')
     new_value = "BSH.Common.EnumType.PowerState.Standby" if current_state == "On" else "BSH.Common.EnumType.PowerState.On"
 
-    client.set_appliance_setting(ha_id, "BSH.Common.Setting.PowerState", new_value)
+    success = client.set_appliance_setting(ha_id, "BSH.Common.Setting.PowerState", new_value)
+    if success:
+        flash("Power updated.", "success")
+        new_state_label = "On" if new_value.endswith("On") else "Off"
+        appliance_name = ha_id
+        for appliance in (get_cached_appliances(client) or []):
+            if appliance.get('haId') == ha_id:
+                appliance_name = appliance.get('name', ha_id)
+                break
+        record_action(session['username'], ha_id, 'power',
+                       f"Turned {new_state_label} {appliance_name}",
+                       url_for('homeconnect'))
+    else:
+        flash("Could not change power state - the appliance may need remote control enabled on its own panel.", "error")
 
     return redirect(url_for('homeconnect'))
 
@@ -304,8 +442,32 @@ def start_appliance_program(ha_id):
     client = HomeConnectClient(base_url=base_url)
 
     program_key = request.form.get('program_key')
+    temperature = request.form.get('temperature')
     if program_key:
-        client.start_program(ha_id, program_key)
+        options = None
+        if temperature:
+            options = [{
+                "key": "Cooking.Oven.Option.SetpointTemperature",
+                "value": int(temperature),
+                "unit": "\u00b0C"
+            }]
+        success, error_message = client.start_program(ha_id, program_key, options)
+        program_name = program_key.split('.')[-1]
+        if success:
+            temp_note = f" at {temperature}\u00b0C" if temperature else ""
+            flash(f"Started {program_name}{temp_note}.", "success")
+            appliance_name = ha_id
+            for appliance in (get_cached_appliances(client) or []):
+                if appliance.get('haId') == ha_id:
+                    appliance_name = appliance.get('name', ha_id)
+                    break
+            record_action(session['username'], ha_id, 'program',
+                           f"Started {program_name}{temp_note} on {appliance_name}",
+                           url_for('homeconnect'),
+                           program_key=program_key,
+                           temperature=temperature)
+        else:
+            flash(f"Could not start {program_name}: {error_message}", "error")
 
     return redirect(url_for('homeconnect'))
 # Route: Logout
@@ -327,6 +489,8 @@ def admin_users():
     whitelist = load_whitelist()
     all_users = load_users()
 
+    record_visit(session['username'], 'admin', 'Admin', url_for('admin_users'))
+
     return render_template('admin_users.html',
                          username=session['username'],
                          current_username=session['username'],
@@ -339,6 +503,8 @@ def all_devices():
     """Show every individual device, regardless of category"""
     if 'username' not in session:
         return redirect(url_for('login_page'))
+
+    record_visit(session['username'], 'all-devices', 'All Devices', url_for('all_devices'))
 
     return render_template('all_devices.html', username=session['username'])
 
@@ -431,6 +597,32 @@ def api_demote_user():
     except Exception as e:
         logger.error(f"Error demoting user: {str(e)}")
         return {'success': False, 'error': 'Error demoting user'}, 500
+
+# Route: Full activity history
+@app.route('/history')
+def history():
+    """Show the full recent-activity history (not just the dashboard's capped view)"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    entries = get_activity(session['username'])
+    for e in entries:
+        e['last_used_display'] = relative_time(e.get('last_used', ''))
+
+    return render_template('history.html', username=session['username'], entries=entries)
+
+# Route: Pin/unpin a recent-activity entry
+@app.route('/api/activity/pin', methods=['POST'])
+def api_toggle_pin():
+    """Toggle the pinned state of one activity entry, then go back where we came from"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    entry_id = request.form.get('entry_id')
+    if entry_id:
+        toggle_pin(session['username'], entry_id)
+
+    return redirect(request.referrer or url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -305,7 +305,49 @@ class HomeConnectClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching available programs for {ha_id}: {e}")
             return None
-    def start_program(self, ha_id: str, program_key: str, options: Optional[List[Dict]] = None) -> bool:
+
+    def get_program_options(self, ha_id: str, program_key: str) -> Optional[List[Dict]]:
+        """
+        Get the option list (e.g. temperature range) for one specific program.
+
+        Args:
+            ha_id: The appliance's haId
+            program_key: The program to inspect, e.g. "Cooking.Oven.Program.HeatingMode.HotAir"
+
+        Returns:
+            List of option dicts (each with "key", "type", "unit", "constraints", etc.),
+            or None if the request fails.
+        """
+        access_token = self._load_access_token()
+        if not access_token:
+            return None
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/vnd.bsh.sdk.v1+json"
+        }
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/homeappliances/{ha_id}/programs/available/{program_key}",
+                headers=headers,
+                timeout=10
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Error fetching options for program {program_key} on {ha_id} ({response.status_code}): {response.text}")
+                return None
+
+            data = response.json()
+            options = data.get("data", {}).get("options", [])
+            logger.info(f"Found {len(options)} option(s) for program {program_key} on {ha_id}")
+            return options
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching options for program {program_key} on {ha_id}: {e}")
+            return None
+
+    def start_program(self, ha_id: str, program_key: str, options: Optional[List[Dict]] = None) -> tuple:
         """
         Start a program on an appliance.
 
@@ -315,11 +357,12 @@ class HomeConnectClient:
             options: Optional list of {"key": ..., "value": ...} option dicts
 
         Returns:
-            True if the program was accepted, False otherwise.
+            (True, None) if the program was accepted.
+            (False, error_message) if it was rejected - error_message explains why.
         """
         access_token = self._load_access_token()
         if not access_token:
-            return False
+            return False, "Not authenticated with HomeConnect"
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -340,52 +383,57 @@ class HomeConnectClient:
             )
 
             if response.status_code not in (200, 201, 204):
+                error_message = response.text
+                try:
+                    error_message = response.json().get("error", {}).get("description", response.text)
+                except ValueError:
+                    pass
                 logger.error(f"Error starting program {program_key} on {ha_id} ({response.status_code}): {response.text}")
-                return False
+                return False, error_message
 
             logger.info(f"Started program {program_key} on {ha_id}")
-            return True
+            return True, None
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error starting program {program_key} on {ha_id}: {e}")
+            return False, str(e)
+
+def stop_program(self, ha_id: str) -> bool:
+    """
+    Stop whatever program is currently running on an appliance.
+
+    Args:
+        ha_id: The appliance's haId
+
+    Returns:
+        True if the stop was accepted, False otherwise.
+    """
+    access_token = self._load_access_token()
+    if not access_token:
+        return False
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/vnd.bsh.sdk.v1+json"
+    }
+
+    try:
+        response = requests.delete(
+            f"{self.base_url}/api/homeappliances/{ha_id}/programs/active",
+            headers=headers,
+            timeout=10
+        )
+
+        if response.status_code not in (200, 204):
+            logger.error(f"Error stopping program on {ha_id} ({response.status_code}): {response.text}")
             return False
 
-    def stop_program(self, ha_id: str) -> bool:
-        """
-        Stop whatever program is currently running on an appliance.
+        logger.info(f"Stopped program on {ha_id}")
+        return True
 
-        Args:
-            ha_id: The appliance's haId
-
-        Returns:
-            True if the stop was accepted, False otherwise.
-        """
-        access_token = self._load_access_token()
-        if not access_token:
-            return False
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/vnd.bsh.sdk.v1+json"
-        }
-
-        try:
-            response = requests.delete(
-                f"{self.base_url}/api/homeappliances/{ha_id}/programs/active",
-                headers=headers,
-                timeout=10
-            )
-
-            if response.status_code not in (200, 204):
-                logger.error(f"Error stopping program on {ha_id} ({response.status_code}): {response.text}")
-                return False
-
-            logger.info(f"Stopped program on {ha_id}")
-            return True
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error stopping program on {ha_id}: {e}")
-            return False
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error stopping program on {ha_id}: {e}")
+        return False
 
 def format_status(status_list: List[Dict]) -> List[Dict]:
     """

@@ -5,267 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dream Machine - ARIA</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .search-bar {
-            margin-bottom: 30px;
-            display: flex;
-            gap: 10px;
-        }
-
-        .search-bar input {
-            flex: 1;
-            padding: 12px 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .search-bar input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .refresh-info {
-            text-align: right;
-            font-size: 12px;
-            color: #999;
-            margin-bottom: 10px;
-        }
-
-        .hidden-row {
-            display: none;
-        }
-
-        .device-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 8px;
-            display: inline-block;
-        }
-
-        .network-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .breadcrumb {
-            margin-bottom: 20px;
-        }
-
-        .breadcrumb a {
-            color: #007bff;
-            text-decoration: none;
-            margin-right: 10px;
-        }
-
-        .breadcrumb a:hover {
-            text-decoration: underline;
-        }
-
-        .network-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .stat-card.devices {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .stat-card.cameras {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-
-        .stat-card h3 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            text-transform: uppercase;
-            opacity: 0.9;
-        }
-
-        .stat-card .number {
-            font-size: 42px;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-
-        .devices-section, .cameras-section {
-            margin-bottom: 40px;
-        }
-
-        .section-title {
-            font-size: 22px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            color: #333;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-
-        .devices-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .devices-table thead {
-            background: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        .devices-table th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            color: #495057;
-            text-transform: uppercase;
-            font-size: 12px;
-        }
-
-        .devices-table td {
-            padding: 15px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .devices-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-
-        .devices-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .status-online {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-offline {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .ip-address {
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            color: #666;
-        }
-
-        .mac-address {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            color: #999;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-
-        .empty-state p {
-            margin: 10px 0;
-        }
-
-        .error-box {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .back-button {
-            display: inline-block;
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-
-        .back-button:hover {
-            background: #5568d3;
-        }
-
-        .refresh-button {
-            padding: 10px 20px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-            font-size: 14px;
-        }
-
-        .refresh-button:hover {
-            background: #218838;
-        }
-
-        .connection-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .connection-badge.wired {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-
-        .connection-badge.wireless {
-            background: #f3e5f5;
-            color: #7b1fa2;
-        }
-
-        .connection-time {
-            font-size: 12px;
-            color: #666;
-            font-family: 'Courier New', monospace;
-        }
-
-        .clients-section {
-            margin-bottom: 40px;
-        }
-    </style>
 </head>
 <body>
     <div class="navbar">
         <div class="navbar-content">
             <h1 class="navbar-title">🌐 Dream Machine Network Dashboard</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+                <a href="/homeconnect" class="{% if request.path == '/homeconnect' %}active{% endif %}">Appliances</a>
+                <a href="/dreammachine" class="{% if request.path == '/dreammachine' %}active{% endif %}">Network</a>
+                <a href="/all-devices" class="{% if request.path == '/all-devices' %}active{% endif %}">All Devices</a>
+                <a href="/history" class="{% if request.path == '/history' %}active{% endif %}">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users" class="{% if request.path == '/admin/users' %}active{% endif %}">Admin</a>{% endif %}
+            </div>
             <div class="navbar-right">
                 <span class="username">Welcome, {{ username }}!</span>
                 <a href="/logout" class="btn-logout">Logout</a>
@@ -303,7 +55,7 @@
 
             <!-- Network Stats -->
             <div class="network-stats">
-                <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="stat-card">
                     <h3>Total Connected Clients</h3>
                     <div class="number">{{ client_count }}</div>
                 </div>
@@ -315,7 +67,7 @@
                     <h3>Cameras</h3>
                     <div class="number">{{ camera_count }}</div>
                 </div>
-                <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="stat-card">
                     <h3>Controller IP</h3>
                     <div class="number" style="font-size: 16px; word-break: break-all;">10.20.40.1</div>
                 </div>

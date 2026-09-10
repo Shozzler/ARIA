@@ -10,6 +10,14 @@
     <div class="navbar">
         <div class="navbar-content">
             <h1 class="navbar-title">ARIA - Admin Dashboard</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+                <a href="/homeconnect" class="{% if request.path == '/homeconnect' %}active{% endif %}">Appliances</a>
+                <a href="/dreammachine" class="{% if request.path == '/dreammachine' %}active{% endif %}">Network</a>
+                <a href="/all-devices" class="{% if request.path == '/all-devices' %}active{% endif %}">All Devices</a>
+                <a href="/history" class="{% if request.path == '/history' %}active{% endif %}">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users" class="{% if request.path == '/admin/users' %}active{% endif %}">Admin</a>{% endif %}
+            </div>
             <div class="navbar-right">
                 <span class="username">{{ username }} (Admin)</span>
                 <a href="/dashboard" class="btn-secondary">Back to Dashboard</a>
@@ -203,6 +211,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': CSRF_TOKEN,
                     },
                     body: `username=${encodeURIComponent(username)}`
                 });
@@ -235,6 +244,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': CSRF_TOKEN,
                         },
                         body: `username=${encodeURIComponent(username)}`
                     });
@@ -263,6 +273,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': CSRF_TOKEN,
                         },
                         body: `username=${encodeURIComponent(username)}`
                     });
@@ -291,6 +302,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': CSRF_TOKEN,
                         },
                         body: `username=${encodeURIComponent(username)}`
                     });
@@ -319,6 +331,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': CSRF_TOKEN,
                         },
                         body: `username=${encodeURIComponent(username)}`
                     });

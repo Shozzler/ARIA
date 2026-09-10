@@ -6,6 +6,7 @@ requests==2.31.0
 
 # Web Framework (for future web dashboard)
 flask==3.0.0
+flask-wtf==1.2.1
 
 # Environment variables
 python-dotenv==1.0.0

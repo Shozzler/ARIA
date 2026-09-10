@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">History</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+                <a href="/homeconnect" class="{% if request.path == '/homeconnect' %}active{% endif %}">Appliances</a>
+                <a href="/dreammachine" class="{% if request.path == '/dreammachine' %}active{% endif %}">Network</a>
+                <a href="/all-devices" class="{% if request.path == '/all-devices' %}active{% endif %}">All Devices</a>
+                <a href="/history" class="{% if request.path == '/history' %}active{% endif %}">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users" class="{% if request.path == '/admin/users' %}active{% endif %}">Admin</a>{% endif %}
+            </div>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="/dashboard">&larr; Back to Dashboard</a>
+            </div>
+
+            <div class="search-bar">
+                <input type="text" id="historySearch" placeholder="Search history...">
+            </div>
+
+            <div class="devices-section">
+                <div class="section-title">All activity ({{ entries|length }})</div>
+
+                {% if entries %}
+                    <div class="user-list" id="historyList">
+                        {% for entry in entries %}
+                            <div class="user-item">
+                                <div class="user-info">
+                                    <span class="user-name">{{ entry.label }}</span>
+                                    {% if entry.kind == 'page' %}
+                                        <span class="badge user">Page</span>
+                                    {% else %}
+                                        <span class="badge admin">Action</span>
+                                    {% endif %}
+                                    {% if entry.pinned %}
+                                        <span class="status-badge created">Pinned</span>
+                                    {% endif %}
+                                </div>
+                                <div class="user-actions">
+                                    <span class="your-account">{{ entry.count }}&times; &middot; {{ entry.last_used_display }}</span>
+                                    {% if entry.kind == 'action' and entry.meta.action_type == 'program' %}
+                                        <form method="POST" action="{{ url_for('start_appliance_program', ha_id=entry.meta.ha_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="program_key" value="{{ entry.meta.program_key }}">
+                                            {% if entry.meta.temperature %}<input type="hidden" name="temperature" value="{{ entry.meta.temperature }}">{% endif %}
+                                            <button type="submit" class="btn-action">Run again</button>
+                                        </form>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('api_toggle_pin') }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="entry_id" value="{{ entry.id }}">
+                                        <button type="submit" class="btn-action">{% if entry.pinned %}Unpin{% else %}Pin{% endif %}</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <p>Nothing yet &mdash; visit Appliances or Network to get started.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('historySearch');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                const term = this.value.toLowerCase();
+                document.querySelectorAll('#historyList .user-item').forEach(function(row) {
+                    const match = row.innerText.toLowerCase().includes(term);
+                    row.classList.toggle('hidden-row', !match);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
