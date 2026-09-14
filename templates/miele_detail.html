@@ -1,0 +1,78 @@
+{%- import '_appliance_icons.html' as icons -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ display_name }} - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">{{ display_name }}</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/homeconnect" class="active">Appliances</a>
+                <a href="/dreammachine">Network</a>
+                <a href="/all-devices">All Devices</a>
+                <a href="/history">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users">Admin</a>{% endif %}
+            </div>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="{{ url_for('homeconnect') }}">← Back to Appliances</a>
+            </div>
+
+            {% with flashed = get_flashed_messages(with_categories=true) %}
+                {% for category, message in flashed %}
+                    <div class="{% if category == 'error' %}error-box{% else %}success-box{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endwith %}
+
+            <div class="appliance-detail-header">
+                <div class="appliance-detail-icon">{{ icons.appliance_icon_svg(type, 'appliance-detail-icon-svg') }}</div>
+                <div class="appliance-detail-title">
+                    <h2>{{ display_name }}</h2>
+                    <div class="appliance-card-type">{{ type }}{% if model %} · {{ model }}{% endif %}</div>
+                </div>
+            </div>
+
+            {% if can_power_on %}
+                <div class="control-buttons">
+                    <form method="POST" action="{{ url_for('miele_power_on', device_id=device_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-action">Turn On</button>
+                    </form>
+                </div>
+            {% endif %}
+
+            {% if detail_fields %}
+                <div class="section-title">Details</div>
+                <div class="status-detail-list">
+                    {% for item in detail_fields %}
+                        <div class="status-detail-item">
+                            <span class="status-detail-label">{{ item.label }}</span>
+                            <span class="status-detail-value">{{ item.value }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <p class="text-muted" style="margin-top: 20px; display: block;">
+                This appliance doesn't expose a program list through Miele's API — only power-on control is available remotely.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

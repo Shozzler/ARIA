@@ -1,0 +1,130 @@
+{%- import '_appliance_icons.html' as icons -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ display_name }} - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">{{ display_name }}</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/homeconnect" class="active">Appliances</a>
+                <a href="/dreammachine">Network</a>
+                <a href="/all-devices">All Devices</a>
+                <a href="/history">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users">Admin</a>{% endif %}
+            </div>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="{{ url_for('homeconnect') }}">← Back to Appliances</a>
+            </div>
+
+            {% with flashed = get_flashed_messages(with_categories=true) %}
+                {% for category, message in flashed %}
+                    <div class="{% if category == 'error' %}error-box{% else %}success-box{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endwith %}
+
+            <div class="appliance-detail-header">
+                <div class="appliance-detail-icon">{{ icons.appliance_icon_svg(type, 'appliance-detail-icon-svg') }}</div>
+                <div class="appliance-detail-title">
+                    <h2>{{ display_name }}</h2>
+                    <div class="appliance-card-type">{{ brand }} {{ type }}{% if connected %} · Connected{% endif %}</div>
+                </div>
+            </div>
+
+            {% if power_state %}
+                <div class="control-buttons">
+                    <form method="POST" action="{{ url_for('toggle_appliance_power', ha_id=ha_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="current_state" value="{{ power_state }}">
+                        <button type="submit" class="btn-action">
+                            {% if power_state == 'On' %}Turn Off{% else %}Turn On{% endif %}
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+
+            {% if status_display %}
+                <div class="section-title">Details</div>
+                <div class="status-detail-list">
+                    {% for item in status_display %}
+                        <div class="status-detail-item">
+                            <span class="status-detail-label">{{ item.label }}</span>
+                            <span class="status-detail-value">{{ item.value }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if programs %}
+                <div class="section-title">Programs</div>
+                <form method="POST" action="{{ url_for('start_appliance_program', ha_id=ha_id) }}" id="program-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="program_key" id="selected-program-key" value="">
+
+                    <div class="program-grid">
+                        {% for program in programs %}
+                            <div class="program-btn"
+                                 data-key="{{ program.key }}"
+                                 {% if program.temperature %}
+                                 data-temp-min="{{ program.temperature.min }}"
+                                 data-temp-max="{{ program.temperature.max }}"
+                                 data-temp-step="{{ program.temperature.stepsize }}"
+                                 data-temp-default="{{ program.temperature.default }}"
+                                 {% endif %}
+                                 onclick="selectProgram(this)">
+                                {{ program.key.split('.')[-1] }}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div id="temp-field-wrap" style="display:none; margin: 16px 0;">
+                        <label for="temperature" class="status-detail-label">Temperature (°C)</label><br>
+                        <input type="number" name="temperature" id="temperature" class="temp-input">
+                    </div>
+
+                    <button type="submit" class="btn-action" id="start-btn" disabled>Start</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+<script>
+function selectProgram(el) {
+    document.querySelectorAll('.program-btn').forEach(function(b) { b.classList.remove('selected'); });
+    el.classList.add('selected');
+    document.getElementById('selected-program-key').value = el.dataset.key;
+    document.getElementById('start-btn').disabled = false;
+
+    var tempWrap = document.getElementById('temp-field-wrap');
+    var tempInput = document.getElementById('temperature');
+    if (el.dataset.tempMin) {
+        tempInput.min = el.dataset.tempMin;
+        tempInput.max = el.dataset.tempMax;
+        tempInput.step = el.dataset.tempStep;
+        tempInput.value = el.dataset.tempDefault;
+        tempWrap.style.display = '';
+    } else {
+        tempInput.value = '';
+        tempWrap.style.display = 'none';
+    }
+}
+</script>
+</body>
+</html>

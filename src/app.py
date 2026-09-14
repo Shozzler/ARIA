@@ -20,6 +20,7 @@ import json
 
 from src.integrations.unifi import UniFiClient
 from src.integrations.homeconnect import HomeConnectClient, format_status
+from src.integrations.miele import MieleClient
 from src.activity import (
     record_visit, record_action, get_activity, toggle_pin, relative_time, DASHBOARD_LIMIT
 )
@@ -349,55 +350,115 @@ def dreammachine():
                              username=session['username'],
                              error=f"Error connecting to Dream Machine: {str(e)}")
     
-# Route: HomeConnect / Appliances Dashboard
+# Display-name overrides: Sean's own naming, applied on top of whatever
+# the real HomeConnect/Miele accounts call these appliances.
+DISPLAY_NAME_OVERRIDES = {
+    "Four": "Four à vapeur",
+    "Four 2": "Four",
+}
+
+# Route: Appliances Dashboard (icon grid - HomeConnect + Miele together)
 @app.route('/homeconnect')
 def homeconnect():
-    """Show HomeConnect appliances dashboard"""
+    """Show all appliances (HomeConnect + Miele) as a clickable icon grid"""
     if 'username' not in session:
         return redirect(url_for('login_page'))
 
     load_dotenv()
     base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
-
     client = HomeConnectClient(base_url=base_url)
     appliances = get_cached_appliances(client)
 
+    cards = []
+
     if appliances is None:
-        return render_template('homeconnect.html',
-                             username=session['username'],
-                             error="Could not fetch appliances. Have you logged in with homeconnect_login.py?")
+        flash("Could not fetch HomeConnect appliances. Have you logged in with homeconnect_login.py?", "error")
+    else:
+        for appliance in appliances:
+            display_name = DISPLAY_NAME_OVERRIDES.get(appliance.get('name'), appliance.get('name'))
+            cards.append({
+                'display_name': display_name,
+                'type': appliance.get('type'),
+                'detail_url': url_for('homeconnect_detail', ha_id=appliance['haId']),
+            })
 
-    for appliance in appliances:
-        status = get_cached_status(client, appliance['haId'])
-        appliance['status_display'] = format_status(status) if status else []
+    miele_client = MieleClient()
+    miele_appliances = miele_client.get_appliances()
 
-        settings = client.get_appliance_settings(appliance['haId'])
-        appliance['power_state'] = None
-        programs = get_cached_programs(client, appliance['haId'])
-        appliance['programs'] = programs if programs else []
-        for program in appliance['programs']:
-            cache_key = (appliance['haId'], program['key'])
-            if cache_key in _program_options_cache:
-                program['temperature'] = _program_options_cache[cache_key]
-            else:
-                program_options = client.get_program_options(appliance['haId'], program['key'])
-                program['temperature'] = None
-                if program_options:
-                    for opt in program_options:
-                        if opt.get('key') == 'Cooking.Oven.Option.SetpointTemperature':
-                            program['temperature'] = opt.get('constraints', {})
-                            break
-                _program_options_cache[cache_key] = program['temperature']
-        if settings:
-            for item in settings:
-                if item.get('key') == 'BSH.Common.Setting.PowerState':
-                    appliance['power_state'] = item.get('value', '').split('.')[-1]
+    if miele_appliances is None:
+        flash("Could not fetch Miele appliances. Have you logged in with miele_login.py?", "error")
+    else:
+        for appliance in miele_appliances:
+            ident = appliance.get('ident', {})
+            type_label = ident.get('type', {}).get('value_localized', 'Appliance')
+            display_name = ident.get('deviceName') or type_label
+            cards.append({
+                'display_name': display_name,
+                'type': type_label,
+                'detail_url': url_for('miele_detail', device_id=appliance['id']),
+            })
+
     record_visit(session['username'], 'appliances', 'Appliances', url_for('homeconnect'))
 
     return render_template('homeconnect.html',
         username=session['username'],
-        appliances=appliances,
-        appliance_count=len(appliances))
+        cards=cards,
+        appliance_count=len(cards))
+
+# Route: HomeConnect appliance detail page
+@app.route('/homeconnect/<ha_id>')
+def homeconnect_detail(ha_id):
+    """Show one HomeConnect appliance's details, status, and controls"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    load_dotenv()
+    base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+    client = HomeConnectClient(base_url=base_url)
+
+    appliances = get_cached_appliances(client) or []
+    appliance_info = next((a for a in appliances if a.get('haId') == ha_id), None)
+    if not appliance_info:
+        flash("Appliance not found.", "error")
+        return redirect(url_for('homeconnect'))
+
+    display_name = DISPLAY_NAME_OVERRIDES.get(appliance_info.get('name'), appliance_info.get('name'))
+
+    status = get_cached_status(client, ha_id)
+    status_display = format_status(status) if status else []
+
+    settings = client.get_appliance_settings(ha_id)
+    power_state = None
+    if settings:
+        for item in settings:
+            if item.get('key') == 'BSH.Common.Setting.PowerState':
+                power_state = item.get('value', '').split('.')[-1]
+
+    programs = get_cached_programs(client, ha_id) or []
+    for program in programs:
+        cache_key = (ha_id, program['key'])
+        if cache_key in _program_options_cache:
+            program['temperature'] = _program_options_cache[cache_key]
+        else:
+            program_options = client.get_program_options(ha_id, program['key'])
+            program['temperature'] = None
+            if program_options:
+                for opt in program_options:
+                    if opt.get('key') == 'Cooking.Oven.Option.SetpointTemperature':
+                        program['temperature'] = opt.get('constraints', {})
+                        break
+            _program_options_cache[cache_key] = program['temperature']
+
+    return render_template('homeconnect_detail.html',
+        username=session['username'],
+        ha_id=ha_id,
+        display_name=display_name,
+        type=appliance_info.get('type'),
+        brand=appliance_info.get('brand'),
+        connected=appliance_info.get('connected'),
+        status_display=status_display,
+        power_state=power_state,
+        programs=programs)
 
 # Route: Toggle appliance power state
 @app.route('/homeconnect/<ha_id>/toggle-power', methods=['POST'])
@@ -424,11 +485,11 @@ def toggle_appliance_power(ha_id):
                 break
         record_action(session['username'], ha_id, 'power',
                        f"Turned {new_state_label} {appliance_name}",
-                       url_for('homeconnect'))
+                       url_for('homeconnect_detail', ha_id=ha_id))
     else:
         flash("Could not change power state - the appliance may need remote control enabled on its own panel.", "error")
 
-    return redirect(url_for('homeconnect'))
+    return redirect(url_for('homeconnect_detail', ha_id=ha_id))
 
 # Route: Start a program on an appliance
 @app.route('/homeconnect/<ha_id>/start-program', methods=['POST'])
@@ -449,12 +510,12 @@ def start_appliance_program(ha_id):
             options = [{
                 "key": "Cooking.Oven.Option.SetpointTemperature",
                 "value": int(temperature),
-                "unit": "\u00b0C"
+                "unit": "°C"
             }]
         success, error_message = client.start_program(ha_id, program_key, options)
         program_name = program_key.split('.')[-1]
         if success:
-            temp_note = f" at {temperature}\u00b0C" if temperature else ""
+            temp_note = f" at {temperature}°C" if temperature else ""
             flash(f"Started {program_name}{temp_note}.", "success")
             appliance_name = ha_id
             for appliance in (get_cached_appliances(client) or []):
@@ -463,13 +524,73 @@ def start_appliance_program(ha_id):
                     break
             record_action(session['username'], ha_id, 'program',
                            f"Started {program_name}{temp_note} on {appliance_name}",
-                           url_for('homeconnect'),
+                           url_for('homeconnect_detail', ha_id=ha_id),
                            program_key=program_key,
                            temperature=temperature)
         else:
             flash(f"Could not start {program_name}: {error_message}", "error")
 
-    return redirect(url_for('homeconnect'))
+    return redirect(url_for('homeconnect_detail', ha_id=ha_id))
+
+# Route: Miele appliance detail page
+@app.route('/miele/<device_id>')
+def miele_detail(device_id):
+    """Show one Miele appliance's details, status, and controls"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    client = MieleClient()
+    appliances = client.get_appliances() or []
+    appliance_info = next((a for a in appliances if a.get('id') == device_id), None)
+    if not appliance_info:
+        flash("Appliance not found.", "error")
+        return redirect(url_for('homeconnect'))
+
+    ident = appliance_info.get('ident', {})
+    state = appliance_info.get('state', {})
+    type_label = ident.get('type', {}).get('value_localized', 'Appliance')
+    display_name = ident.get('deviceName') or type_label
+
+    actions = client.get_appliance_actions(device_id) or {}
+    can_power_on = bool(actions.get('powerOn'))
+
+    detail_fields = []
+    for key in ('status', 'programType', 'programPhase'):
+        field = state.get(key)
+        if isinstance(field, dict) and field.get('value_localized'):
+            detail_fields.append({
+                'label': field.get('key_localized', key),
+                'value': field.get('value_localized'),
+            })
+
+    return render_template('miele_detail.html',
+        username=session['username'],
+        device_id=device_id,
+        display_name=display_name,
+        type=type_label,
+        model=ident.get('deviceIdentLabel', {}).get('techType'),
+        detail_fields=detail_fields,
+        can_power_on=can_power_on)
+
+# Route: Turn a Miele appliance on
+@app.route('/miele/<device_id>/power-on', methods=['POST'])
+def miele_power_on(device_id):
+    """Turn on a Miele appliance"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    client = MieleClient()
+    success = client.set_appliance_power(device_id, on=True)
+
+    if success:
+        flash("Power on sent.", "success")
+        record_action(session['username'], device_id, 'power',
+                       f"Turned on {device_id}", url_for('miele_detail', device_id=device_id))
+    else:
+        flash("Could not turn on the appliance.", "error")
+
+    return redirect(url_for('miele_detail', device_id=device_id))
+
 # Route: Logout
 @app.route('/logout')
 def logout():

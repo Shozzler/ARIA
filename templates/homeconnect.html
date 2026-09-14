@@ -1,15 +1,16 @@
+{%- import '_appliance_icons.html' as icons -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeConnect - ARIA</title>
+    <title>Appliances - ARIA</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="navbar">
         <div class="navbar-content">
-            <h1 class="navbar-title">🍳 HomeConnect Appliances</h1>
+            <h1 class="navbar-title">🏠 Appliances</h1>
             <div class="navbar-menu">
                 <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
                 <a href="/homeconnect" class="{% if request.path == '/homeconnect' %}active{% endif %}">Appliances</a>
@@ -40,12 +41,6 @@
                 {% endfor %}
             {% endwith %}
 
-            {% if error %}
-                <div class="error-box">
-                    <strong>Error:</strong> {{ error }}
-                </div>
-            {% else %}
-
             <div class="network-stats">
                 <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                     <h3>Total Appliances</h3>
@@ -56,117 +51,23 @@
             <div class="devices-section">
                 <div class="section-title">🏠 Your Appliances</div>
 
-                {% if appliances %}
-                    <table class="devices-table">
-                        <thead>
-                           <tr>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>Brand</th>
-                            <th>Status</th>
-                            <th>Details</th>
-                            <th>Power</th>
-                            <th>Programs</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                            {% for appliance in appliances %}
-                                <tr>
-                                    <td><strong>{{ appliance.name }}</strong></td>
-                                    <td>{{ appliance.type }}</td>
-                                    <td>{{ appliance.brand }}</td>
-                                    <td>
-                                        {% if appliance.connected %}
-                                            <span class="status-badge status-online">Connected</span>
-                                        {% else %}
-                                            <span class="status-badge status-offline">Offline</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if appliance.status_display %}
-                                            <div class="status-detail-list">
-                                                {% for item in appliance.status_display %}
-                                                    <div class="status-detail-item">
-                                                        <span class="status-detail-label">{{ item.label }}</span>
-                                                        <span class="status-detail-value">{{ item.value }}</span>
-                                                    </div>
-                                                {% endfor %}
-                                            </div>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if appliance.power_state %}
-                                            <form method="POST" action="{{ url_for('toggle_appliance_power', ha_id=appliance.haId) }}">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="current_state" value="{{ appliance.power_state }}">
-                                                <button type="submit" class="btn-action">
-                                                    {% if appliance.power_state == 'On' %}
-                                                        Turn Off
-                                                    {% else %}
-                                                        Turn On
-                                                    {% endif %}
-                                                </button>
-                                            </form>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if appliance.programs %}
-                                            <form method="POST" action="{{ url_for('start_appliance_program', ha_id=appliance.haId) }}">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <select name="program_key" class="program-select" onchange="updateTempField(this)">
-                                                    {% for program in appliance.programs %}
-                                                        <option value="{{ program.key }}"
-                                                            {% if program.temperature %}data-temp-min="{{ program.temperature.min }}" data-temp-max="{{ program.temperature.max }}" data-temp-step="{{ program.temperature.stepsize }}" data-temp-default="{{ program.temperature.default }}"{% endif %}>{{ program.key.split('.')[-1] }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                                <input type="number" name="temperature" class="temp-input" title="Temperature (°C)" style="width: 70px;">
-                                                <button type="submit" class="btn-action">Start</button>
-                                            </form>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                {% if cards %}
+                    <div class="appliance-grid">
+                        {% for card in cards %}
+                            <a href="{{ card.detail_url }}" class="appliance-card">
+                                <div class="appliance-icon">{{ icons.appliance_icon_svg(card.type) }}</div>
+                                <div class="appliance-card-name">{{ card.display_name }}</div>
+                                <div class="appliance-card-type">{{ card.type }}</div>
+                            </a>
+                        {% endfor %}
+                    </div>
                 {% else %}
                     <div class="empty-state">
                         <p>No appliances found</p>
                     </div>
                 {% endif %}
             </div>
-
-            {% endif %}
         </div>
     </div>
-<script>
-function updateTempField(selectEl) {
-    const form = selectEl.closest('form');
-    const tempInput = form.querySelector('.temp-input');
-    const selectedOption = selectEl.options[selectEl.selectedIndex];
-    const min = selectedOption.getAttribute('data-temp-min');
-    if (min !== null) {
-        tempInput.min = min;
-        tempInput.max = selectedOption.getAttribute('data-temp-max');
-        tempInput.step = selectedOption.getAttribute('data-temp-step');
-        tempInput.value = selectedOption.getAttribute('data-temp-default');
-        tempInput.disabled = false;
-        tempInput.style.display = '';
-    } else {
-        tempInput.value = '';
-        tempInput.disabled = true;
-        tempInput.style.display = 'none';
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.program-select').forEach(updateTempField);
-});
-</script>
 </body>
 </html>
