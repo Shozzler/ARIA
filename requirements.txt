@@ -8,6 +8,9 @@ requests==2.31.0
 flask==3.0.0
 flask-wtf==1.2.1
 
+# LG webOS TV (local network control, no cloud account needed)
+aiowebostv==0.10.0
+
 # Environment variables
 python-dotenv==1.0.0
 

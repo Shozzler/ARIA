@@ -43,3 +43,4 @@ config/secrets.json
 data/users.json
 data/homeconnect_tokens.json
 data/miele_tokens.json
+data/webos_tv_key.json

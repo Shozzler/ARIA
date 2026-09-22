@@ -8,5 +8,6 @@ This module contains integrations with various home automation devices:
 """
 
 from .unifi import UniFiClient
+from .webos_tv import WebOSTVClient
 
-__all__ = ['UniFiClient']
+__all__ = ['UniFiClient', 'WebOSTVClient']

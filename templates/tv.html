@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LG TV - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">LG TV</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+                <a href="/homeconnect" class="{% if request.path == '/homeconnect' %}active{% endif %}">Appliances</a>
+                <a href="/dreammachine" class="{% if request.path == '/dreammachine' %}active{% endif %}">Network</a>
+                <a href="/all-devices" class="{% if request.path == '/all-devices' %}active{% endif %}">All Devices</a>
+                <a href="/history" class="{% if request.path == '/history' %}active{% endif %}">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users" class="{% if request.path == '/admin/users' %}active{% endif %}">Admin</a>{% endif %}
+            </div>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="/dashboard">← Back to Dashboard</a>
+            </div>
+
+            {% with flashed = get_flashed_messages(with_categories=true) %}
+                {% for category, message in flashed %}
+                    <div class="{% if category == 'error' %}error-box{% else %}success-box{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endwith %}
+
+            <div class="appliance-detail-header">
+                <div class="appliance-detail-icon" style="font-size: 2.4em;">📺</div>
+                <div class="appliance-detail-title">
+                    <h2>LG TV</h2>
+                    <div class="appliance-card-type">{{ tv_ip or "No IP configured" }}</div>
+                </div>
+            </div>
+
+            {% if status %}
+                <div class="control-buttons">
+                    {% if status.is_on %}
+                        <form method="POST" action="{{ url_for('tv_power_off') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn-action">Turn Off</button>
+                        </form>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('tv_mute') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-action">{% if status.muted %}Unmute{% else %}Mute{% endif %}</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('tv_volume', direction='down') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-secondary">Volume &minus;</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('tv_volume', direction='up') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-secondary">Volume &plus;</button>
+                    </form>
+                </div>
+
+                <div class="section-title">Status</div>
+                <div class="status-detail-list">
+                    <div class="status-detail-item">
+                        <span class="status-detail-label">Power</span>
+                        <span class="status-detail-value">{% if status.is_on %}On{% else %}Off{% endif %}</span>
+                    </div>
+                    <div class="status-detail-item">
+                        <span class="status-detail-label">Volume</span>
+                        <span class="status-detail-value">{{ status.volume if status.volume is not none else "Unknown" }}</span>
+                    </div>
+                    <div class="status-detail-item">
+                        <span class="status-detail-label">Muted</span>
+                        <span class="status-detail-value">{% if status.muted %}Yes{% else %}No{% endif %}</span>
+                    </div>
+                    {% if status.current_app %}
+                        <div class="status-detail-item">
+                            <span class="status-detail-label">Current App</span>
+                            <span class="status-detail-value">{{ status.current_app }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            {% elif paired %}
+                <p class="text-muted" style="margin-top: 20px; display: block;">
+                    Could not reach the TV right now. Make sure it's turned on and still at {{ tv_ip }}, then reload this page.
+                </p>
+            {% else %}
+                <p class="text-muted" style="margin-top: 20px; display: block;">
+                    This TV hasn't been paired yet. On the same machine as ARIA, run <code>python pair_tv.py</code> once and accept the prompt on the TV with your remote.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

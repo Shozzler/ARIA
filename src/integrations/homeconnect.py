@@ -398,42 +398,49 @@ class HomeConnectClient:
             logger.error(f"Error starting program {program_key} on {ha_id}: {e}")
             return False, str(e)
 
-def stop_program(self, ha_id: str) -> bool:
-    """
-    Stop whatever program is currently running on an appliance.
+    def stop_program(self, ha_id: str) -> tuple:
+        """
+        Stop whatever program is currently running on an appliance.
 
-    Args:
-        ha_id: The appliance's haId
+        Args:
+            ha_id: The appliance's haId
 
-    Returns:
-        True if the stop was accepted, False otherwise.
-    """
-    access_token = self._load_access_token()
-    if not access_token:
-        return False
+        Returns:
+            (True, None) if the stop was accepted.
+            (False, error_message) if it was rejected - error_message explains why.
+        """
+        access_token = self._load_access_token()
+        if not access_token:
+            return False, "Not authenticated with HomeConnect"
 
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/vnd.bsh.sdk.v1+json"
-    }
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/vnd.bsh.sdk.v1+json"
+        }
 
-    try:
-        response = requests.delete(
-            f"{self.base_url}/api/homeappliances/{ha_id}/programs/active",
-            headers=headers,
-            timeout=10
-        )
+        try:
+            response = requests.delete(
+                f"{self.base_url}/api/homeappliances/{ha_id}/programs/active",
+                headers=headers,
+                timeout=10
+            )
 
-        if response.status_code not in (200, 204):
-            logger.error(f"Error stopping program on {ha_id} ({response.status_code}): {response.text}")
-            return False
+            if response.status_code not in (200, 204):
+                error_message = response.text
+                try:
+                    error_message = response.json().get("error", {}).get("description", response.text)
+                except ValueError:
+                    pass
+                logger.error(f"Error stopping program on {ha_id} ({response.status_code}): {response.text}")
+                return False, error_message
 
-        logger.info(f"Stopped program on {ha_id}")
-        return True
+            logger.info(f"Stopped program on {ha_id}")
+            return True, None
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error stopping program on {ha_id}: {e}")
-        return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error stopping program on {ha_id}: {e}")
+            return False, str(e)
+
 
 def format_status(status_list: List[Dict]) -> List[Dict]:
     """

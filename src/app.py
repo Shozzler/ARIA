@@ -21,6 +21,7 @@ import json
 from src.integrations.unifi import UniFiClient
 from src.integrations.homeconnect import HomeConnectClient, format_status
 from src.integrations.miele import MieleClient
+from src.integrations.webos_tv import WebOSTVClient
 from src.activity import (
     record_visit, record_action, get_activity, toggle_pin, relative_time, DASHBOARD_LIMIT
 )
@@ -532,6 +533,33 @@ def start_appliance_program(ha_id):
 
     return redirect(url_for('homeconnect_detail', ha_id=ha_id))
 
+# Route: Stop the currently running program on an appliance
+@app.route('/homeconnect/<ha_id>/stop-program', methods=['POST'])
+def stop_appliance_program(ha_id):
+    """Stop whatever program is currently running on an appliance"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    load_dotenv()
+    base_url = os.getenv("HOMECONNECT_BASE_URL", "https://simulator.home-connect.com")
+    client = HomeConnectClient(base_url=base_url)
+
+    success, error_message = client.stop_program(ha_id)
+    if success:
+        flash("Program stopped.", "success")
+        appliance_name = ha_id
+        for appliance in (get_cached_appliances(client) or []):
+            if appliance.get('haId') == ha_id:
+                appliance_name = appliance.get('name', ha_id)
+                break
+        record_action(session['username'], ha_id, 'program',
+                       f"Stopped program on {appliance_name}",
+                       url_for('homeconnect_detail', ha_id=ha_id))
+    else:
+        flash(f"Could not stop the program: {error_message}", "error")
+
+    return redirect(url_for('homeconnect_detail', ha_id=ha_id))
+
 # Route: Miele appliance detail page
 @app.route('/miele/<device_id>')
 def miele_detail(device_id):
@@ -590,6 +618,101 @@ def miele_power_on(device_id):
         flash("Could not turn on the appliance.", "error")
 
     return redirect(url_for('miele_detail', device_id=device_id))
+
+# Route: LG TV status and controls
+@app.route('/tv')
+def tv():
+    """Show the LG TV's status and controls"""
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    tv_ip = os.getenv("TV_IP")
+    status = None
+    paired = False
+
+    if not tv_ip:
+        flash("TV_IP is not set in .env.", "error")
+    else:
+        client = WebOSTVClient(tv_ip)
+        paired = os.path.exists(client.key_file)
+        if not paired:
+            flash("The TV hasn't been paired yet - run pair_tv.py once, locally.", "error")
+        else:
+            status = client.get_status()
+            if status is None:
+                flash("Could not reach the TV. Is it turned on?", "error")
+
+    record_visit(session['username'], 'tv', 'TV', url_for('tv'))
+
+    return render_template('tv.html',
+        username=session['username'],
+        tv_ip=tv_ip,
+        paired=paired,
+        status=status)
+
+# Route: Turn the TV off
+@app.route('/tv/power-off', methods=['POST'])
+def tv_power_off():
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    tv_ip = os.getenv("TV_IP")
+    if not tv_ip:
+        flash("TV_IP is not set in .env.", "error")
+        return redirect(url_for('tv'))
+
+    client = WebOSTVClient(tv_ip)
+    if client.power_off():
+        flash("TV turned off.", "success")
+        record_action(session['username'], 'lg_tv', 'power', "Turned off LG TV", url_for('tv'))
+    else:
+        flash("Could not turn off the TV.", "error")
+
+    return redirect(url_for('tv'))
+
+# Route: Mute/unmute the TV
+@app.route('/tv/mute', methods=['POST'])
+def tv_mute():
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    tv_ip = os.getenv("TV_IP")
+    if not tv_ip:
+        flash("TV_IP is not set in .env.", "error")
+        return redirect(url_for('tv'))
+
+    client = WebOSTVClient(tv_ip)
+    status = client.get_status()
+    currently_muted = bool(status.get('muted')) if status else False
+
+    if client.set_mute(not currently_muted):
+        flash("TV unmuted." if currently_muted else "TV muted.", "success")
+    else:
+        flash("Could not change the TV's mute state.", "error")
+
+    return redirect(url_for('tv'))
+
+# Route: Step the TV's volume up or down
+@app.route('/tv/volume/<direction>', methods=['POST'])
+def tv_volume(direction):
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    if direction not in ('up', 'down'):
+        flash("Invalid volume direction.", "error")
+        return redirect(url_for('tv'))
+
+    tv_ip = os.getenv("TV_IP")
+    if not tv_ip:
+        flash("TV_IP is not set in .env.", "error")
+        return redirect(url_for('tv'))
+
+    client = WebOSTVClient(tv_ip)
+    ok = client.volume_up() if direction == 'up' else client.volume_down()
+    if not ok:
+        flash("Could not change the TV's volume.", "error")
+
+    return redirect(url_for('tv'))
 
 # Route: Logout
 @app.route('/logout')
