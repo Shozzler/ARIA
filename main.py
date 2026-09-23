@@ -4,6 +4,7 @@ Main entry point for the MCP server
 """
 
 import logging
+import os
 from colorlog import ColoredFormatter
 from src.auth import ensure_data_folder
 from src.app import app
@@ -49,7 +50,12 @@ def main():
     try:
         logger.info("ARIA is running on http://localhost:5000")
         logger.info("Press Ctrl+C to stop the server")
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        # Debug mode is OFF unless FLASK_DEBUG=1 is set. Never enable it on
+        # the NAS: the debugger lets anyone who triggers an error run code.
+        debug = os.getenv("FLASK_DEBUG", "0") == "1"
+        if debug:
+            logger.warning("Flask debug mode is ON - never use this on the NAS!")
+        app.run(host='0.0.0.0', port=5000, debug=debug)
     except KeyboardInterrupt:
         logger.info("Server shutting down...")
         logger.info("Goodbye!")
