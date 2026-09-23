@@ -204,7 +204,14 @@ class WebOSTVClient:
 
     def power_off(self) -> bool:
         """Turn the TV off."""
-        return self._call(lambda client: client.power_off()) is not None
+        async def _power_off(client: WebOsClient):
+            # aiowebostv's power_off() returns None even when it works,
+            # and _call() uses None to mean "failed" - so return True
+            # ourselves once the command has been sent without an error.
+            await client.power_off()
+            return True
+
+        return self._call(_power_off) is not None
 
     def set_volume(self, volume: int) -> bool:
         """Set the TV's volume (0-100)."""
