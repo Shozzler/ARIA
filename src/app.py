@@ -650,6 +650,30 @@ def tv():
         paired=paired,
         status=status)
 
+# Route: Turn the TV on (Wake-on-LAN)
+@app.route('/tv/power-on', methods=['POST'])
+def tv_power_on():
+    if 'username' not in session:
+        return redirect(url_for('login_page'))
+
+    tv_ip = os.getenv("TV_IP")
+    tv_mac = os.getenv("TV_MAC")
+    if not tv_mac:
+        flash("TV_MAC is not set in .env.", "error")
+        return redirect(url_for('tv'))
+
+    client = WebOSTVClient(tv_ip, mac=tv_mac)
+    if client.power_on():
+        # Wake-on-LAN gets no reply, so wait for the TV to boot before
+        # reloading the page - otherwise it would still show as off.
+        time.sleep(8)
+        flash("Turn-on signal sent to the TV.", "success")
+        record_action(session['username'], 'lg_tv', 'power', "Turned on LG TV", url_for('tv'))
+    else:
+        flash("Could not send the turn-on signal to the TV.", "error")
+
+    return redirect(url_for('tv'))
+
 # Route: Turn the TV off
 @app.route('/tv/power-off', methods=['POST'])
 def tv_power_off():

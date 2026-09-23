@@ -19,24 +19,59 @@ Pairing:
     account.
 
 Note on power on:
-    aiowebostv's power_on() only works while the TV is in a low-power
-    standby state (e.g. screen off but still reachable on the
-    network) - it is a no-op if the TV has been fully powered off.
-    Waking a fully-off TV needs Wake-on-LAN, which this client does
-    not implement yet, so power_on is intentionally not exposed here
-    to avoid a button that looks like it works but usually won't.
+    When the TV is fully off it is not listening on the webOS
+    websocket, so power_on() can't use aiowebostv. Instead it sends a
+    Wake-on-LAN "magic packet" to the TV's MAC address (TV_MAC in
+    .env). This needs "Turn on via Wi-Fi" / "Mobile TV On" enabled in
+    the TV's settings.
 """
 
 import asyncio
 import json
 import logging
 import os
+import socket
 from typing import Any, Dict, Optional
 
 from aiowebostv import WebOsClient
 from aiowebostv.exceptions import WebOsTvCommandError, WebOsTvPairError
 
 logger = logging.getLogger(__name__)
+
+
+def send_magic_packet(mac: str, ip: Optional[str] = None, port: int = 9):
+    """
+    Send a Wake-on-LAN "magic packet" to wake a device by its MAC address.
+
+    The packet is 6 bytes of 0xFF followed by the MAC address repeated
+    16 times, sent as a UDP broadcast. The device's network card stays
+    listening for exactly this pattern even while the device is off.
+
+    Args:
+        mac: MAC address like "aa:bb:cc:dd:ee:ff" (":" or "-" separators)
+        ip: The device's IP (optional). Used to also send to its subnet's
+            broadcast address (e.g. 10.20.40.255), which gets out of a
+            Docker container more reliably than 255.255.255.255.
+        port: UDP port - 9 is the standard Wake-on-LAN port.
+    """
+    # "aa:bb:cc:dd:ee:ff" -> "aabbccddeeff" -> 6 raw bytes
+    mac_clean = mac.replace(":", "").replace("-", "").strip()
+    mac_bytes = bytes.fromhex(mac_clean)
+    if len(mac_bytes) != 6:
+        raise ValueError(f"Invalid MAC address: {mac}")
+
+    packet = b"\xff" * 6 + mac_bytes * 16
+
+    targets = ["255.255.255.255"]
+    if ip:
+        # Assumes a /24 network: 10.20.40.60 -> 10.20.40.255
+        targets.append(ip.rsplit(".", 1)[0] + ".255")
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        for target in targets:
+            sock.sendto(packet, (target, port))
+            logger.info(f"Wake-on-LAN packet sent to {mac} via {target}:{port}")
 
 
 class WebOSTVClient:
@@ -49,15 +84,18 @@ class WebOSTVClient:
     clients are.
     """
 
-    def __init__(self, host: str, key_file: str = "data/webos_tv_key.json"):
+    def __init__(self, host: str, key_file: str = "data/webos_tv_key.json",
+                 mac: Optional[str] = None):
         """
         Initialize the webOS TV client.
 
         Args:
             host: The TV's local IP address, e.g. "10.20.40.60"
             key_file: Path to the JSON file holding the saved pairing key
+            mac: The TV's MAC address - only needed for power_on()
         """
         self.host = host
+        self.mac = mac
         self.key_file = key_file
         logger.info(f"WebOS TV client initialized for {host}")
 
@@ -145,6 +183,24 @@ class WebOSTVClient:
         return self._call(lambda client: client.get_apps())
 
     # --- Control ---
+
+    def power_on(self) -> bool:
+        """
+        Turn the TV on via Wake-on-LAN.
+
+        Returns True if the packet was sent - this does NOT confirm the
+        TV actually woke up (Wake-on-LAN gets no reply). Check
+        get_status() a few seconds later for that.
+        """
+        if not self.mac:
+            logger.error("Can't power on the TV - TV_MAC is not set in .env")
+            return False
+        try:
+            send_magic_packet(self.mac, self.host)
+            return True
+        except (OSError, ValueError) as e:
+            logger.error(f"Wake-on-LAN failed: {e}")
+            return False
 
     def power_off(self) -> bool:
         """Turn the TV off."""
