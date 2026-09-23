@@ -1,0 +1,61 @@
+{%- import '_appliance_icons.html' as icons -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm - ARIA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h1 class="navbar-title">{{ display_name }}</h1>
+            <div class="navbar-menu">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/homeconnect" class="active">Appliances</a>
+                <a href="/dreammachine">Network</a>
+                <a href="/all-devices">All Devices</a>
+                <a href="/history">History</a>
+                {% if session.get('role') == 'admin' %}<a href="/admin/users">Admin</a>{% endif %}
+            </div>
+            <div class="navbar-right">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-content">
+            <div class="breadcrumb">
+                <a href="{{ cancel_url }}">← Back to {{ display_name }}</a>
+            </div>
+
+            <div class="appliance-detail-header">
+                <div class="appliance-detail-icon">{{ icons.appliance_icon_svg(type, 'appliance-detail-icon-svg') }}</div>
+                <div class="appliance-detail-title">
+                    <h2>{{ title }}</h2>
+                    <div class="appliance-card-type">{{ display_name }}</div>
+                </div>
+            </div>
+
+            <div class="error-box" style="margin: 20px 0;">
+                ⚠ {{ message }}
+            </div>
+
+            <div class="control-buttons">
+                <form method="POST" action="{{ action_url }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="confirmed" value="yes">
+                    {% for name, value in fields.items() %}
+                        <input type="hidden" name="{{ name }}" value="{{ value }}">
+                    {% endfor %}
+                    <button type="submit" class="btn-action">{{ confirm_label }}</button>
+                </form>
+                <a href="{{ cancel_url }}" class="btn-secondary">Cancel</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

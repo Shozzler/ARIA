@@ -406,6 +406,38 @@ def homeconnect():
         cards=cards,
         appliance_count=len(cards))
 
+# --- Safety confirmations ---
+# Actions that heat something up or could spoil food must be confirmed on a
+# second page before they're sent to the real appliance. The form re-posts to
+# the same route with confirmed=yes, so the check lives on the server - a
+# double-click, a stale browser tab, or (later) an AI calling the route can't
+# skip it.
+def is_confirmed():
+    """True if the form was submitted from the confirmation page."""
+    return request.form.get('confirmed') == 'yes'
+
+def find_appliance(client, ha_id):
+    """Return (appliance_info, display_name) for a HomeConnect appliance."""
+    for appliance in (get_cached_appliances(client) or []):
+        if appliance.get('haId') == ha_id:
+            name = appliance.get('name', ha_id)
+            return appliance, DISPLAY_NAME_OVERRIDES.get(name, name)
+    return {}, ha_id
+
+def render_confirmation(ha_id, appliance, display_name, title, message,
+                        confirm_label, action_url, fields):
+    """Show the 'Are you sure?' page instead of performing the action."""
+    return render_template('confirm_action.html',
+        username=session['username'],
+        type=appliance.get('type'),
+        display_name=display_name,
+        title=title,
+        message=message,
+        confirm_label=confirm_label,
+        action_url=action_url,
+        fields=fields,
+        cancel_url=url_for('homeconnect_detail', ha_id=ha_id))
+
 # Route: HomeConnect appliance detail page
 @app.route('/homeconnect/<ha_id>')
 def homeconnect_detail(ha_id):
@@ -475,6 +507,25 @@ def toggle_appliance_power(ha_id):
     current_state = request.form.get('current_state')
     new_value = "BSH.Common.EnumType.PowerState.Standby" if current_state == "On" else "BSH.Common.EnumType.PowerState.On"
 
+    appliance, display_name = find_appliance(client, ha_id)
+    appliance_type = appliance.get('type')
+    turning_on = current_state != "On"
+    if not is_confirmed():
+        if appliance_type == "Oven" and turning_on:
+            return render_confirmation(ha_id, appliance, display_name,
+                "Turn on the oven?",
+                f"This will turn on {display_name}. Make sure nothing is left inside or on top of it.",
+                "Yes, turn it on",
+                url_for('toggle_appliance_power', ha_id=ha_id),
+                {"current_state": current_state})
+        if appliance_type == "FridgeFreezer" and not turning_on:
+            return render_confirmation(ha_id, appliance, display_name,
+                "Turn off the fridge?",
+                f"This will turn off {display_name}. Food inside will start warming up.",
+                "Yes, turn it off",
+                url_for('toggle_appliance_power', ha_id=ha_id),
+                {"current_state": current_state})
+
     success = client.set_appliance_setting(ha_id, "BSH.Common.Setting.PowerState", new_value)
     if success:
         flash("Power updated.", "success")
@@ -505,6 +556,25 @@ def start_appliance_program(ha_id):
 
     program_key = request.form.get('program_key')
     temperature = request.form.get('temperature')
+
+    # Only accept a whole number for the temperature - anything else would
+    # crash int() below or be sent to the oven as garbage.
+    if temperature and not temperature.strip().isdigit():
+        flash("The temperature must be a whole number.", "error")
+        return redirect(url_for('homeconnect_detail', ha_id=ha_id))
+
+    appliance, display_name = find_appliance(client, ha_id)
+    if program_key and appliance.get('type') == "Oven" and not is_confirmed():
+        program_label = program_key.split('.')[-1]
+        temp_text = f" at {temperature}°C" if temperature else ""
+        return render_confirmation(ha_id, appliance, display_name,
+            "Start the oven?",
+            f"This will start {program_label}{temp_text} on {display_name} and it will begin heating. "
+            "Make sure nothing is left inside that shouldn't be.",
+            "Yes, start it",
+            url_for('start_appliance_program', ha_id=ha_id),
+            {"program_key": program_key, "temperature": temperature or ""})
+
     if program_key:
         options = None
         if temperature:
